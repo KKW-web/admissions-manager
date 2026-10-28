@@ -1,0 +1,16 @@
+private/
+__pycache__/
+*.sqlite3*
+*.db
+*.xlsx
+*.xls
+*.csv
+*.zip
+*.png
+*.log
+.env
+.env.*
+backups/
+analysis.json
+audit-details.json
+test_app.py
