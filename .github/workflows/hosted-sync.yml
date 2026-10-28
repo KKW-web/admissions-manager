@@ -1,0 +1,42 @@
+name: Sync and validate hosted source
+on:
+  push:
+    paths: [hosted-source.tar.gz, .github/workflows/hosted-sync.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Verify and unpack source without student data
+        run: |
+          python3 - <<'PY'
+          import tarfile,hashlib,pathlib
+          archive=pathlib.Path('hosted-source.tar.gz')
+          assert hashlib.sha256(archive.read_bytes()).hexdigest() == 'f877bdc46304f40705594e9d5647935fcac8dcf508e2d0e740e375bb4af5bf34'
+          with tarfile.open(archive) as source:
+              for item in source.getmembers():
+                  p=pathlib.PurePosixPath(item.name)
+                  assert item.isfile() and not p.is_absolute() and '..' not in p.parts
+                  assert not any(s in p.parts for s in ('private','.wrangler','.sites-runtime','node_modules','dist','.git'))
+                  assert not p.name.startswith(('.env','.dev.vars'))
+                  assert p.suffix.lower() not in ('.sqlite3','.db','.xlsx','.csv','.zip','.log')
+                  target=pathlib.Path('hosted') / item.name
+                  target.parent.mkdir(parents=True,exist_ok=True)
+                  target.write_bytes(source.extractfile(item).read())
+          PY
+      - name: Verify behavior and browser code
+        run: |
+          node --test hosted/tests/logic.test.mjs
+          node --check hosted/public/app.js
+      - name: Commit the readable hosted source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add hosted
+          if ! git diff --cached --quiet; then
+            git commit -m "Sync hosted 2027 admissions manager source"
+            git push
+          fi
