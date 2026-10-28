@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1793190262684,
+      "tag": "0000_uneven_ma_gnuci",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1793227594049,
+      "tag": "0001_numerous_zarda",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793227935185,
+      "tag": "0002_boring_lockjaw",
+      "breakpoints": true
+    }
+  ]
+}

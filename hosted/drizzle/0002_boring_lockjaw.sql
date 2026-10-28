@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `teacher_members_email_unique` ON `teacher_members` (`email`);
