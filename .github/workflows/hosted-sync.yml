@@ -1,7 +1,7 @@
 name: Sync and validate hosted source
 on:
   push:
-    paths: [hosted-source.tar.gz, .github/workflows/hosted-sync.yml]
+    paths: [hosted-source.tar.gz, hosted-source.sha256, .github/workflows/hosted-sync.yml]
   workflow_dispatch:
 permissions:
   contents: write
@@ -15,7 +15,7 @@ jobs:
           python3 - <<'PY'
           import tarfile,hashlib,pathlib
           archive=pathlib.Path('hosted-source.tar.gz')
-          assert hashlib.sha256(archive.read_bytes()).hexdigest() == 'f877bdc46304f40705594e9d5647935fcac8dcf508e2d0e740e375bb4af5bf34'
+          assert hashlib.sha256(archive.read_bytes()).hexdigest() == pathlib.Path('hosted-source.sha256').read_text().strip()
           with tarfile.open(archive) as source:
               for item in source.getmembers():
                   p=pathlib.PurePosixPath(item.name)
@@ -29,7 +29,7 @@ jobs:
           PY
       - name: Verify behavior and browser code
         run: |
-          node --test hosted/tests/logic.test.mjs
+          node --test hosted/tests/logic.test.mjs hosted/tests/manual-review.test.mjs hosted/tests/interface-summary.test.mjs
           node --check hosted/public/app.js
       - name: Commit the readable hosted source
         run: |
