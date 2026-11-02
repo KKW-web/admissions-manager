@@ -9,3 +9,5 @@ export function summarize(rows,students,issues){const known=['합격','불합격
 export function paginate(rows,page,size){const pages=Math.max(1,Math.ceil(rows.length/size));const selected=Math.min(pages,Math.max(1,page));return {page:selected,pages,total:rows.length,items:rows.slice((selected-1)*size,selected*size)};}
 export function csvCell(value){let s=String(value??'');if(/^[\s]*[=+\-@\t\r]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';}
 export function schedules(rows,today=todayKorea()){const out=[];for(const r of rows)for(const [key,label] of [['interview','면접'],['practical','실기'],['essay','논술'],['announcement','발표']]){const date=dateStart(r.details?.[key]);if(date&&date>=today)out.push({id:r.id,date,label,student:r.name,university:r.university,range:r.details[key]});}return out.sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);}
+
+export function resultSummary(rows){return {firstPassed:rows.filter(r=>['합격','충원합격'].includes(r.first_stage)).length,firstFailed:rows.filter(r=>r.first_stage==='불합격').length,firstMissing:rows.filter(r=>!r.first_stage).length,finalPassed:rows.filter(r=>['합격','충원합격'].includes(r.final_stage)).length};}

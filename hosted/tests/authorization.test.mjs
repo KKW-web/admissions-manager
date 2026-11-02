@@ -1,0 +1,55 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import ts from 'typescript';
+import {DatabaseSync} from 'node:sqlite';
+
+test('public entry preserves authenticated, class-scoped, read-only teacher API',async()=>{
+ const sql=new DatabaseSync(':memory:');
+ for(const migration of fs.readdirSync(new URL('../drizzle/',import.meta.url)).filter(x=>x.endsWith('.sql')).sort())sql.exec(fs.readFileSync(new URL('../drizzle/'+migration,import.meta.url),'utf8'));
+ sql.prepare("INSERT INTO site_settings(key,value) VALUES('import_sealed','true')").run();
+ sql.prepare('INSERT INTO site_owner(id,user_id,email) VALUES(1,?,?)').run('owner','owner@example.invalid');
+ sql.prepare('INSERT INTO teacher_members(user_id,email,classroom,active,role,academic_year) VALUES(?,?,?,?,?,?)').run('teacher','teacher@example.invalid','1',1,'teacher','2026');
+ for(const [id,status,classroom,year] of [[1,'재학생','1','2026'],[2,'재학생','2','2026'],[3,'졸업생','1','2025']]){
+  const student={id,status,classroom,year,number:'1',name:'가상학생'+id,grade:'3.5'};
+  sql.prepare('INSERT INTO admission_records(kind,id,payload) VALUES(?,?,?)').run('students',id,JSON.stringify(student));
+  sql.prepare('INSERT INTO admission_records(kind,id,student_id,payload) VALUES(?,?,?,?)').run('applications',id,id,JSON.stringify({id,student_id:id,birthdate:'080101',exam:'0012345678',details:{},version:1}));
+ }
+ const DB={prepare(query){let args=[];return {bind(...values){args=values;return this;},async first(){return sql.prepare(query).get(...args)||null;},async all(){return {results:sql.prepare(query).all(...args)};},async run(){const x=sql.prepare(query).run(...args);return {meta:{changes:Number(x.changes)}};}};}};
+ let user=null;const env={DB,OWNER_EMAIL:'owner@example.invalid',CSRF_KEY:'synthetic-test-key-only'};
+ const source=fs.readFileSync(new URL('../app/api/[...path]/route.ts',import.meta.url),'utf8');
+ const output=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+ const exports={};new Function('require','exports',output)(name=>name==='cloudflare:workers'?{env}:{getChatGPTUser:async()=>user},exports);
+ const get=path=>exports.GET(new Request('https://test.invalid/api/'+path));
+ assert.equal((await get('data')).status,401);
+ user={userId:'unknown',email:'unknown@example.invalid'};assert.equal((await get('data')).status,403);
+ user={userId:'teacher',email:'teacher@example.invalid'};
+ const me=await (await get('me')).json();const data=await (await get('data')).json();
+ assert.deepEqual(data.students.map(x=>x.id),[1]);assert.deepEqual(data.rows.map(x=>x.student_id),[1]);
+ assert.ok(data.rows.every(x=>!('birthdate' in x)));assert.deepEqual(data.issues,[]);
+ for(const path of ['source?id=1','audit','members'])assert.equal((await get(path)).status,403);
+ const post=path=>exports.POST(new Request('https://test.invalid/api/'+path,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF':me.csrf},body:'{}'}));
+ for(const path of ['application','member','student','resolve','merge'])assert.equal((await post(path)).status,403);
+ sql.prepare("UPDATE teacher_members SET active=0 WHERE user_id='teacher'").run();assert.equal((await get('data')).status,403);
+ user={userId:'owner',email:'owner@example.invalid'};assert.equal((await (await get('data')).json()).rows.length,3);
+ user=null;env.VIEW_PASSWORD='synthetic-pass';
+ const login=(password,origin='https://test.invalid')=>exports.POST(new Request('https://test.invalid/api/pin-login',{method:'POST',headers:{'Content-Type':'application/json','Origin':origin,'CF-Connecting-IP':'192.0.2.10'},body:JSON.stringify({password})}));
+ assert.equal((await login('synthetic-pass','https://evil.invalid')).status,403);
+ assert.equal((await login('wrong')).status,401);
+ assert.equal((await get('data')).status,401);
+ const unlocked=await login('synthetic-pass');assert.equal(unlocked.status,200);
+ const setCookie=unlocked.headers.get('Set-Cookie');assert.match(setCookie,/HttpOnly; Secure; SameSite=Strict/);
+ const cookie=setCookie.split(';')[0];
+ const pinGet=(path,c=cookie)=>exports.GET(new Request('https://test.invalid/api/'+path,{headers:{Cookie:c}}));
+ const viewer=await (await pinGet('me')).json();assert.equal(viewer.role,'viewer');assert.equal(viewer.owner,false);
+ const shared=await (await pinGet('data')).json();assert.equal(shared.rows.length,3);assert.ok(shared.rows.every(r=>!('birthdate' in r)));
+ for(const path of ['source?id=1','members','audit'])assert.equal((await pinGet(path)).status,403);
+ const pinPost=(path,csrf=viewer.csrf)=>exports.POST(new Request('https://test.invalid/api/'+path,{method:'POST',headers:{Cookie:cookie,Origin:'https://test.invalid','Content-Type':'application/json','X-CSRF':csrf},body:'{}'}));
+ for(const path of ['application','member','student','resolve','merge'])assert.equal((await pinPost(path)).status,403);
+ assert.equal((await pinPost('logout','wrong')).status,403);
+ assert.match((await pinPost('logout')).headers.get('Set-Cookie'),/Max-Age=0/);
+ assert.equal((await pinGet('data',cookie.slice(0,-1)+(cookie.endsWith('0')?'1':'0'))).status,401);
+ env.VIEW_PASSWORD='rotated-synthetic-pass';assert.equal((await pinGet('data')).status,401);
+ env.VIEW_PASSWORD='synthetic-pass';for(let i=0;i<18;i++)await login('wrong');assert.equal((await login('synthetic-pass')).status,429);
+ sql.close();
+});

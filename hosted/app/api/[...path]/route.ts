@@ -11,26 +11,50 @@ async function rows(sql:string,...args:any[]){return (await db().prepare(sql).bi
 async function record(kind:string,id:number){const r=await db().prepare('SELECT payload,version FROM admission_records WHERE kind=? AND id=?').bind(kind,id).first<Obj>();return r?{...JSON.parse(r.payload),version:r.version}:null;}
 async function token(id:string){const key=String((env as any).CSRF_KEY||'');if(!key)throw Error('CSRF key unavailable');const imported=await crypto.subtle.importKey('raw',new TextEncoder().encode(key),{name:'HMAC',hash:'SHA-256'},false,['sign']);return Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',imported,new TextEncoder().encode(id)))).map(x=>x.toString(16).padStart(2,'0')).join('');}
 function equal(a:string,b:string){if(a.length!==b.length)return false;let n=0;for(let i=0;i<a.length;i++)n|=a.charCodeAt(i)^b.charCodeAt(i);return n===0;}
-async function identity():Promise<Obj|null>{const user=await getChatGPTUser();if(!user)return null;
+const pinCookie='__Host-admissions_view';
+const pinTTL=4*60*60*1000;
+async function pinIdentity(request:Request):Promise<Obj|null>{
+ const password=String((env as any).VIEW_PASSWORD||'');if(!password)return null;
+ const raw=(request.headers.get('Cookie')||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(pinCookie+'='))?.slice(pinCookie.length+1)||'';
+ const match=/^(\d{13})\.([a-f0-9-]{36})\.([a-f0-9]{64})$/.exec(raw);if(!match)return null;
+ const expires=Number(match[1]),now=Date.now();if(expires<=now||expires>now+pinTTL+60000)return null;
+ const payload=match[1]+'.'+match[2];if(!equal(match[3],await token('view:'+password+':'+payload)))return null;
+ return {id:'view:'+match[2],username:'공유 조회',role:'viewer',owner:false,classroom:'',academicYear:'2026',csrf:await token('view-csrf:'+match[2]),shared:true};
+}
+async function pinLogin(request:Request,b:Obj){
+ if(request.headers.get('Origin')!==new URL(request.url).origin)return response({error:'허용되지 않은 요청입니다.'},403);
+ const password=String((env as any).VIEW_PASSWORD||'');if(!password)return response({error:'접속 비밀번호가 아직 설정되지 않았습니다.'},503);
+ const now=Date.now(),until=now+15*60*1000,ip=request.headers.get('CF-Connecting-IP')||'unknown';
+ // Reserve attempts atomically so parallel requests cannot bypass the limit.
+ for(const [label,limit] of [['ip:'+await token('pin-ip:'+ip),20],['global',200]] as const){
+  const result=await db().prepare("INSERT INTO site_settings(key,value) VALUES(?,json_object('n',1,'until',?)) ON CONFLICT(key) DO UPDATE SET value=CASE WHEN json_extract(value,'$.until')<? THEN excluded.value ELSE json_set(value,'$.n',json_extract(value,'$.n')+1) END RETURNING value").bind('pin-rate:'+label,until,now).first<Obj>();
+  if(!result||JSON.parse(result.value).n>limit)return response({error:'접속 시도가 많습니다. 15분 후 다시 시도해 주세요.'},429);
+ }
+ const supplied=String(b.password||'');if(supplied.length>100||!equal(await token('password:'+supplied),await token('password:'+password)))return response({error:'접속 비밀번호가 맞지 않습니다.'},401);
+ const payload=String(now+pinTTL)+'.'+crypto.randomUUID(),signature=await token('view:'+password+':'+payload);
+ const r=response({saved:true,role:'viewer'});r.headers.set('Set-Cookie',pinCookie+'='+payload+'.'+signature+'; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=14400');return r;
+}
+async function identity(request:Request):Promise<Obj|null>{const user=await getChatGPTUser();if(!user)return pinIdentity(request);
  if(user.email.toLowerCase()===String((env as any).OWNER_EMAIL||'').toLowerCase())await db().prepare('INSERT OR IGNORE INTO site_owner(id,user_id,email) VALUES(1,?,?)').bind(user.userId,user.email).run();
  const owner=await db().prepare('SELECT user_id FROM site_owner WHERE id=1').first<Obj>();
  if(owner?.user_id===user.userId)return {id:user.userId,username:user.email,role:'admin',owner:true,classroom:'',academicYear:'2026',csrf:await token(user.userId)};
  let teacher=await db().prepare('SELECT * FROM teacher_members WHERE active=1 AND (user_id=? OR lower(email)=?) ORDER BY CASE WHEN user_id=? THEN 0 ELSE 1 END LIMIT 1').bind(user.userId,user.email.toLowerCase(),user.userId).first<Obj>();
  if(teacher?.user_id?.startsWith('pending:')){await db().prepare("UPDATE teacher_members SET user_id=? WHERE user_id=? AND active=1").bind(user.userId,teacher.user_id).run();teacher={...teacher,user_id:user.userId};}
  if(teacher?.user_id!==user.userId)teacher=null;
+ if(!teacher){const viewer=await pinIdentity(request);if(viewer)return viewer;}
  if(!teacher)return {id:user.userId,username:user.email,role:'denied',classroom:'',csrf:''};
  return {id:user.userId,username:user.email,role:teacher.role==='admin'?'admin':'teacher',owner:false,classroom:teacher.classroom,academicYear:teacher.academic_year,csrf:await token(user.userId)};
 }
 const auditStatement=(u:Obj,action:string,target:any,detail:any)=>db().prepare('INSERT INTO change_audit(at,actor,action,target,detail) VALUES(?,?,?,?,?)').bind(new Date().toISOString(),u.username,action,String(target),JSON.stringify(detail));
 export async function GET(request:Request){try{const url=new URL(request.url),path=url.pathname.slice(5);
  if(path==='transfer-status'){const key=String((env as any).IMPORT_KEY||'');if(!key||!equal(request.headers.get('Authorization')||'','Bearer '+key))return response({error:'접근 권한이 없습니다.'},403);return response({counts:await rows('SELECT kind,COUNT(*) count FROM admission_records GROUP BY kind'),sealed:(await db().prepare("SELECT value FROM site_settings WHERE key='import_sealed'").first<Obj>())?.value==='true'});}
- const u=await identity();if(!u)return response({error:'ChatGPT 로그인이 필요합니다.'},401);if(u.role==='denied')return response({error:'담당 반 권한이 지정되지 않았습니다.'},403);
+ const u=await identity(request);if(!u)return response({error:'ChatGPT 로그인이 필요합니다.'},401);if(u.role==='denied')return response({error:'담당 반 권한이 지정되지 않았습니다.'},403);
  if(path==='me')return response({...u,hosted:true});
  if(path==='data'){
   if((await db().prepare("SELECT value FROM site_settings WHERE key='import_sealed'").first<Obj>())?.value!=='true')return response({error:'초기 자료를 안전하게 반영하고 있습니다. 잠시 후 새로고침해 주세요.'},503);
-  const studentRows=u.role==='admin'?await rows("SELECT payload FROM admission_records WHERE kind='students'"):await rows("SELECT payload FROM admission_records WHERE kind='students' AND json_extract(payload,'$.status')='재학생' AND json_extract(payload,'$.year')=? AND json_extract(payload,'$.classroom')=?",u.academicYear,u.classroom);const students=studentRows.map(r=>JSON.parse(r.payload));const ids=new Set(students.map(s=>s.id));
+  const studentRows=['admin','viewer'].includes(u.role)?await rows("SELECT payload FROM admission_records WHERE kind='students'"):await rows("SELECT payload FROM admission_records WHERE kind='students' AND json_extract(payload,'$.status')='재학생' AND json_extract(payload,'$.year')=? AND json_extract(payload,'$.classroom')=?",u.academicYear,u.classroom);const students=studentRows.map(r=>JSON.parse(r.payload));const ids=new Set(students.map(s=>s.id));
   const apps=(await rows("SELECT payload,version FROM admission_records WHERE kind='applications'")).map(r=>({...JSON.parse(r.payload),version:r.version})).filter(a=>ids.has(a.student_id));const map=new Map(students.map(s=>[s.id,s]));
-  const data=apps.map(a=>{const s=map.get(a.student_id);const result={...a,name:s.name,status:s.status,year:s.year,classroom:s.classroom,number:s.number,master_grade:s.grade,details:a.details||{}};if(u.role!=='admin')delete result.birthdate;return result;});
+  const data=apps.map(a=>{const s=map.get(a.student_id);const result={...a,name:s.name,status:s.status,year:s.year,classroom:s.classroom,number:s.number,master_grade:s.grade,details:a.details||{}};if(u.role!=='admin')delete result.birthdate;if(u.role==='viewer'){const safe=['field','track_type','broad_track','region','round','school_type','capacity','selection','minimum_requirement','grade9','grade5','converted_score','converted_grade','waitlist','interview','practical','essay','aptitude','announcement'];result.details=Object.fromEntries(Object.entries(result.details).filter(([k])=>safe.includes(k)));}return result;});
   const issues=u.role==='admin'?(await rows("SELECT payload FROM admission_records WHERE kind='issues'")).map(r=>JSON.parse(r.payload)).filter(i=>!i.resolved):[];
   return response({rows:data,students,issues,detail_labels:labels});
  }
@@ -50,9 +74,10 @@ async function importRecords(request:Request,b:Obj){
  if(statements.length)await db().batch(statements);return response({received:b.records.length});
 }
 export async function POST(request:Request){try{const url=new URL(request.url),path=url.pathname.slice(5);if(Number(request.headers.get('Content-Length')||0)>2500000)return response({error:'요청이 너무 큽니다.'},413);const b=await request.json() as Obj;if(!b||Array.isArray(b)||typeof b!=='object')return response({error:'입력값 오류'},400);
+ if(path==='pin-login')return pinLogin(request,b);
  if(path==='import')return importRecords(request,b);
- const u=await identity();if(!u)return response({error:'로그인이 필요합니다.'},401);if(u.role==='denied')return response({error:'조회 권한이 없습니다.'},403);if(request.headers.get('Origin')&&request.headers.get('Origin')!==url.origin)return response({error:'허용되지 않은 요청'},403);if(!equal(request.headers.get('X-CSRF')||'',u.csrf))return response({error:'요청 검증 실패'},403);
- if(path==='logout')return response({});if(u.role!=='admin')return response({error:'관리자만 수정할 수 있습니다.'},403);
+ const u=await identity(request);if(!u)return response({error:'로그인이 필요합니다.'},401);if(u.role==='denied')return response({error:'조회 권한이 없습니다.'},403);if(request.headers.get('Origin')&&request.headers.get('Origin')!==url.origin)return response({error:'허용되지 않은 요청'},403);if(!equal(request.headers.get('X-CSRF')||'',u.csrf))return response({error:'요청 검증 실패'},403);
+ if(path==='logout'){const r=response({});r.headers.set('Set-Cookie',pinCookie+'=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0');return r;}if(u.role!=='admin')return response({error:'관리자만 수정할 수 있습니다.'},403);
  if(path==='member'){
   if(!u.owner)return response({error:'공유 권한은 소유자만 설정할 수 있습니다.'},403);const email=String(b.email||'').trim().toLowerCase(),role=String(b.role||'teacher'),classroom=String(b.classroom||'').trim(),year=String(b.academic_year||'2026'),active=b.active===false?0:1;
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254||!['teacher','admin'].includes(role)||!/^\d{4}$/.test(year)||role==='teacher'&&(!/^\d{1,2}$/.test(classroom)||Number(classroom)<1)||email===u.username.toLowerCase())return response({error:'이메일·권한·담당 반을 확인하세요.'},400);

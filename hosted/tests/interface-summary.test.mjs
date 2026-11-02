@@ -1,0 +1,2 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {resultSummary,filterRows} from '../public/logic.mjs';
+test('1단계·최종 결과를 구분하고 미발표를 미입력으로 집계하지 않음',()=>{const rows=[{first_stage:'합격',final_stage:''},{first_stage:'불합격',final_stage:''},{first_stage:'미발표',final_stage:''},{first_stage:'',final_stage:'합격'},{first_stage:'충원합격',final_stage:'충원합격'}];assert.deepEqual(resultSummary(rows),{firstPassed:2,firstFailed:1,firstMissing:1,finalPassed:2});assert.equal(filterRows(rows,{first:'미입력'}).length,1);});
