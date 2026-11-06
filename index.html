@@ -36,6 +36,32 @@ async function request(path, options) {
   if (!reply.ok) throw new Error(body.error || '조회할 수 없습니다.');
   return body;
 }
+const schoolAliases = new Map([
+  ['서정대학', '서정대학교'],
+  ['영진전문대학', '영진전문대학교'],
+  ['목포대학교', '국립목포대학교'],
+  ['순천대학교', '국립순천대학교']
+]);
+const campusAliases = new Map([
+  ['건국대학교글로컬캠퍼스', ['건국대학교', '글로컬']],
+  ['동국대학교경주캠퍼스', ['동국대학교', 'WISE']],
+  ['한양대학교ERICA캠퍼스', ['한양대학교', 'ERICA']]
+]);
+function schoolInfo(value) {
+  const original = (value || '').normalize('NFKC').trim();
+  const compact = original.replace(/\s+/g, '');
+  const explicit = campusAliases.get(compact);
+  const region = original.match(/^(.+?)\s*\(([^)]+)\)(.*)$/);
+  const campusName = original.match(/^(.+?대학교)\s+(.+?)캠퍼스$/);
+  const [rawName, campus = ''] = explicit || (region
+    ? [region[1], (region[2] + region[3]).trim()]
+    : campusName ? [campusName[1], campusName[2]] : [original]);
+  const name = schoolAliases.get(rawName) || rawName;
+  const label = name === '한성대학교' && campus === '서울' ? name :
+    campus ? name + ' (' + campus + ')' : name;
+  return { name, label };
+}
+
 let allRows = [];
 let filteredRows = [];
 let page = 0;
@@ -43,13 +69,13 @@ const pageSize = 100;
 function selectUniversity() {
   const select = get('university');
   select.replaceChildren(new Option('전체 대학', ''));
-  const names = [...new Set(allRows.map(row => row.university).filter(Boolean))];
+  const names = [...new Set(allRows.map(row => row.school.name).filter(Boolean))];
   names.sort((a, b) => a.localeCompare(b, 'ko'));
   for (const name of names) select.add(new Option(name, name));
 }
 get('university').addEventListener('change', event => {
   const name = event.target.value;
-  showRows(name ? allRows.filter(row => row.university === name) : allRows);
+  showRows(name ? allRows.filter(row => row.school.name === name) : allRows);
 });
 function showRows(rows) {
   filteredRows = rows;
@@ -66,7 +92,7 @@ function render() {
   get('rows').replaceChildren();
   for (const item of filteredRows.slice(page * pageSize, (page + 1) * pageSize)) {
     const row = get('rows').insertRow();
-    for (const value of [item.name, item.university, item.track, item.department, item.first_stage, item.final_stage]) {
+    for (const value of [item.name, item.school.label, item.track, item.department, item.first_stage, item.final_stage]) {
       const cell = row.insertCell();
       cell.textContent = value || '미입력';
       if (['합격', '충원합격'].includes(value)) cell.className = 'pass';
@@ -77,7 +103,7 @@ function render() {
       }
     }
   }
-  get('count').textContent = filteredRows.length + '건';
+  get('count').textContent = filteredRows.length + '건 · 지원 건 기준';
 }
 get('login').addEventListener('submit', async event => {
   event.preventDefault();
@@ -90,7 +116,7 @@ get('login').addEventListener('submit', async event => {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password })
     });
     const { rows } = await request('pages-data', { headers: { Authorization: 'Bearer ' + session } });
-    allRows = rows;
+    allRows = rows.map(row => ({ ...row, school: schoolInfo(row.university) }));
     selectUniversity();
     showRows(allRows);
     get('login').hidden = true;
