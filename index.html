@@ -8,6 +8,7 @@
 <style>
 *{box-sizing:border-box}body{font:16px system-ui,sans-serif;margin:0;background:#f2f6fc;color:#14233e}main{max-width:1000px;margin:auto;padding:3rem 1rem}section,form{background:white;padding:1.5rem;border:1px solid #d6e2f2;border-radius:16px}form{max-width:460px}label{display:block;margin-bottom:.5rem}input,button,select{font:inherit;border:1px solid #8294af;border-radius:8px;padding:.6rem .8rem}button{background:#174ea6;color:white;cursor:pointer}button:disabled{opacity:.6}input{max-width:100%}p[role=status]{min-height:1.5em}#results>div{overflow:auto}table{width:100%;border-collapse:collapse;min-width:630px}th,td{text-align:left;padding:.7rem;border-bottom:1px solid #d6e2f2}th{background:#edf4ff}tbody tr:nth-child(even){background:#f8fbff}.pass{color:#14643f;font-weight:700}.fail{color:#9c2e36}.reserve{color:#754700}
 th button{background:transparent;color:inherit;border:0;padding:.15rem 0;text-align:left;white-space:nowrap;font-weight:700}th button:hover{text-decoration:underline}td:first-child,td:nth-last-child(-n+2){white-space:nowrap}td:nth-last-child(-n+2){min-width:4.5rem}
+.result-top{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:1rem}.stats{display:flex;flex-wrap:wrap;gap:.5rem;margin:0}.stats div{background:#edf4ff;border-radius:8px;padding:.55rem .75rem}.stats dt{font-size:.8rem}.stats dd{margin:.15rem 0 0;font-size:1.25rem;font-weight:700}.summary-note{color:#435674;font-size:.85rem}.single-round{color:#435674;font-size:.8rem}
 </style>
 <main>
 <header><p>교사용 조회</p><h1>2027 수시진학관리</h1></header>
@@ -19,7 +20,17 @@ th button{background:transparent;color:inherit;border:0;padding:.15rem 0;text-al
 </form>
 <p id="status" role="status"></p>
 <section id="results" hidden>
+<div class="result-top">
 <h2>전체 대학 지원 결과</h2>
+<dl class="stats" aria-label="조회 결과 요약">
+<div><dt>지원 인원</dt><dd id="applicants">–</dd></div>
+<div><dt>1차 합격 인원</dt><dd id="first-pass">–</dd></div>
+<div><dt>최종 합격 인원</dt><dd id="final-pass">–</dd></div>
+<div><dt>일괄합산 지원</dt><dd id="single-round">–</dd></div>
+</dl>
+</div>
+<p class="summary-note">현재 선택한 대학 기준입니다. 인원은 항목별로 학생당 한 번만 셉니다. 최종 합격에는 충원합격을 포함합니다.</p>
+<p id="selection-note" class="summary-note"></p>
 <label for="university">대학</label>
 <select id="university"><option value="">전체 대학</option></select>
 <p id="count" aria-live="polite"></p>
@@ -70,7 +81,7 @@ const sortButtons = [...document.querySelectorAll('[data-sort]')];
 const defaultSort = [{ key: 'track', direction: 1 }, { key: 'name', direction: 1 }];
 let sortOrder = defaultSort;
 function sortValue(row, key) {
-  return (key === 'university' ? row.school.label : row[key])?.trim() || '';
+  return (key === 'university' ? row.school.label : key === 'first_stage' && isSingleRound(row) ? '일괄합산' : row[key])?.trim() || '';
 }
 function sortRows(rows, order) {
   return [...rows].sort((left, right) => {
@@ -108,6 +119,7 @@ get('university').addEventListener('change', event => {
 });
 function showRows(rows) {
   filteredRows = sortRows(rows, sortOrder);
+  renderSummary(filteredRows);
   page = 0;
   render();
 }
@@ -139,6 +151,25 @@ get('reset-sort').addEventListener('click', () => {
   sortOrder = defaultSort;
   updateSort();
 });
+function isSingleRound(row) {
+  return row.selection === '일괄합산';
+}
+function renderSummary(rows) {
+  const people = records => new Set(records.map(row => row.student_key)).size;
+  const accepted = status => status === '합격' || status === '충원합격';
+  const format = number => number.toLocaleString('ko-KR');
+  const count = records => records.every(row => row.student_key != null) ? format(people(records)) + '명' : '–';
+  get('applicants').textContent = count(rows);
+  get('first-pass').textContent = count(rows.filter(row => !isSingleRound(row) && accepted(row.first_stage)));
+  get('final-pass').textContent = count(rows.filter(row => accepted(row.final_stage)));
+  get('single-round').textContent = format(rows.filter(isSingleRound).length) + '건';
+  const unknown = rows.filter(row => !row.selection).length;
+  const conflicts = rows.filter(row => isSingleRound(row) && row.first_stage && row.first_stage !== '해당없음').length;
+  get('selection-note').textContent = [
+    unknown ? '선발 방식 미확인 ' + format(unknown) + '건' : '',
+    conflicts ? '일괄합산으로 분류됐으나 1차 기록이 있는 ' + format(conflicts) + '건은 확인이 필요합니다.' : ''
+  ].filter(Boolean).join(' · ');
+}
 function render() {
   const pages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
   get('page').textContent = (page + 1) + ' / ' + pages;
@@ -147,9 +178,17 @@ function render() {
   get('rows').replaceChildren();
   for (const item of filteredRows.slice(page * pageSize, (page + 1) * pageSize)) {
     const row = get('rows').insertRow();
-    for (const value of [item.name, item.school.label, item.track, item.department, item.first_stage, item.final_stage]) {
+    const first = isSingleRound(item) ? '일괄합산' : item.first_stage;
+    for (const value of [item.name, item.school.label, item.track, item.department, first, item.final_stage]) {
       const cell = row.insertCell();
       cell.textContent = value || '미입력';
+      if (row.cells.length === 5 && isSingleRound(item)) {
+        cell.className = 'single-round';
+        if (item.first_stage && item.first_stage !== '해당없음') {
+          cell.textContent += ' · 확인 필요';
+          cell.title = '기록된 1차 결과: ' + item.first_stage;
+        }
+      }
       if (['합격', '충원합격'].includes(value)) cell.className = 'pass';
       if (value === '불합격') cell.className = 'fail';
       if (value === '예비') {
