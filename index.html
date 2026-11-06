@@ -7,6 +7,7 @@
 <title>2027 수시진학관리</title>
 <style>
 *{box-sizing:border-box}body{font:16px system-ui,sans-serif;margin:0;background:#f2f6fc;color:#14233e}main{max-width:1000px;margin:auto;padding:3rem 1rem}section,form{background:white;padding:1.5rem;border:1px solid #d6e2f2;border-radius:16px}form{max-width:460px}label{display:block;margin-bottom:.5rem}input,button,select{font:inherit;border:1px solid #8294af;border-radius:8px;padding:.6rem .8rem}button{background:#174ea6;color:white;cursor:pointer}button:disabled{opacity:.6}input{max-width:100%}p[role=status]{min-height:1.5em}#results>div{overflow:auto}table{width:100%;border-collapse:collapse;min-width:630px}th,td{text-align:left;padding:.7rem;border-bottom:1px solid #d6e2f2}th{background:#edf4ff}tbody tr:nth-child(even){background:#f8fbff}.pass{color:#14643f;font-weight:700}.fail{color:#9c2e36}.reserve{color:#754700}
+th button{background:transparent;color:inherit;border:0;padding:.15rem 0;text-align:left;white-space:nowrap;font-weight:700}th button:hover{text-decoration:underline}td:first-child,td:nth-last-child(-n+2){white-space:nowrap}td:nth-last-child(-n+2){min-width:4.5rem}
 </style>
 <main>
 <header><p>교사용 조회</p><h1>2027 수시진학관리</h1></header>
@@ -23,7 +24,9 @@
 <select id="university"><option value="">전체 대학</option></select>
 <p id="count" aria-live="polite"></p>
 <button id="lock" type="button">조회 종료</button>
-<div><table><thead><tr><th>학생</th><th>대학</th><th>전형</th><th>모집단위</th><th>1차</th><th>최종</th></tr></thead><tbody id="rows"></tbody></table></div>
+<p id="sort-status" aria-live="polite"></p>
+<button id="reset-sort" type="button">기본 정렬</button>
+<div><table><thead><tr><th scope="col"><button type="button" data-sort="name">학생 <span aria-hidden="true">↕</span></button></th><th scope="col"><button type="button" data-sort="university">대학 <span aria-hidden="true">↕</span></button></th><th scope="col"><button type="button" data-sort="track">전형 <span aria-hidden="true">↕</span></button></th><th scope="col"><button type="button" data-sort="department">모집단위 <span aria-hidden="true">↕</span></button></th><th scope="col"><button type="button" data-sort="first_stage">1차 <span aria-hidden="true">↕</span></button></th><th scope="col"><button type="button" data-sort="final_stage">최종 <span aria-hidden="true">↕</span></button></th></tr></thead><tbody id="rows"></tbody></table></div>
 <p><button id="previous" type="button">이전</button> <span id="page"></span> <button id="next" type="button">다음</button></p>
 </section>
 </main>
@@ -62,6 +65,32 @@ function schoolInfo(value) {
   return { name, label };
 }
 
+const collator = new Intl.Collator('ko', { numeric: true });
+const sortButtons = [...document.querySelectorAll('[data-sort]')];
+const defaultSort = [{ key: 'track', direction: 1 }, { key: 'name', direction: 1 }];
+let sortOrder = defaultSort;
+function sortValue(row, key) {
+  return (key === 'university' ? row.school.label : row[key])?.trim() || '';
+}
+function sortRows(rows, order) {
+  return [...rows].sort((left, right) => {
+    for (const { key, direction } of order) {
+      const a = sortValue(left, key);
+      const b = sortValue(right, key);
+      if (!a || !b) {
+        if (a !== b) return a ? -1 : 1;
+        continue;
+      }
+      const comparison = collator.compare(a, b);
+      if (comparison) return comparison * direction;
+      if (key === 'final_stage' && a === '예비') {
+        const rank = row => Number.parseInt(row.waitlist, 10) || Infinity;
+        if (rank(left) !== rank(right)) return rank(left) < rank(right) ? -direction : direction;
+      }
+    }
+    return 0;
+  });
+}
 let allRows = [];
 let filteredRows = [];
 let page = 0;
@@ -78,12 +107,38 @@ get('university').addEventListener('change', event => {
   showRows(name ? allRows.filter(row => row.school.name === name) : allRows);
 });
 function showRows(rows) {
-  filteredRows = rows;
+  filteredRows = sortRows(rows, sortOrder);
   page = 0;
   render();
 }
 get('previous').addEventListener('click', () => { page--; render(); });
 get('next').addEventListener('click', () => { page++; render(); });
+function updateSort() {
+  for (const button of sortButtons) {
+    const direction = sortOrder.find(item => item.key === button.dataset.sort)?.direction;
+    button.querySelector('span').textContent = direction === 1 ? '↑' : direction === -1 ? '↓' : '↕';
+    button.parentElement.removeAttribute('aria-sort');
+    if (button.dataset.sort === sortOrder[0].key) {
+      button.parentElement.setAttribute('aria-sort', direction === 1 ? 'ascending' : 'descending');
+    }
+  }
+  const primary = sortButtons.find(button => button.dataset.sort === sortOrder[0].key);
+  get('sort-status').textContent = sortOrder === defaultSort ? '전형 오름차순 → 학생 이름 오름차순' :
+    primary.firstChild.textContent.trim() + (sortOrder[0].direction === 1 ? ' 오름차순' : ' 내림차순');
+  showRows(filteredRows);
+}
+for (const button of sortButtons) {
+  button.addEventListener('click', () => {
+    const key = button.dataset.sort;
+    const direction = sortOrder[0].key === key ? -sortOrder[0].direction : 1;
+    sortOrder = [{ key, direction }, ...defaultSort.filter(item => item.key !== key)];
+    updateSort();
+  });
+}
+get('reset-sort').addEventListener('click', () => {
+  sortOrder = defaultSort;
+  updateSort();
+});
 function render() {
   const pages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
   get('page').textContent = (page + 1) + ' / ' + pages;
@@ -118,7 +173,9 @@ get('login').addEventListener('submit', async event => {
     const { rows } = await request('pages-data', { headers: { Authorization: 'Bearer ' + session } });
     allRows = rows.map(row => ({ ...row, school: schoolInfo(row.university) }));
     selectUniversity();
+    sortOrder = defaultSort;
     showRows(allRows);
+    updateSort();
     get('login').hidden = true;
     get('results').hidden = false;
     get('lock').focus();
