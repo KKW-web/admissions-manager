@@ -75,6 +75,46 @@ function schoolInfo(value) {
   return { name, label };
 }
 
+const hansungTracks = new Map([
+  ['학생부종합(한성인재전형)', '한성인재'], ['한성인재ㅐ', '한성인재'],
+  ['학생부종합(고른기회전형)', '고른기회'],
+  ['실기(실기우수자전형)', '실기우수자'],
+  ['학생부교과(지역균형-수능 최저학력기준 미적용)', '지역균형'],
+  ['학생부교과(교과우수-수능 최저학력기준 적용)', '교과우수']
+]);
+function prepareRows(rows) {
+  const prepared = [];
+  const hansung = new Map();
+  for (const source of rows) {
+    const row = { ...source, school: schoolInfo(source.university) };
+    if (row.school.name !== '한성대학교') {
+      prepared.push(row);
+      continue;
+    }
+    row.track = hansungTracks.get(source.track) || source.track;
+    if (row.student_key == null || !row.track || !row.department) {
+      prepared.push(row);
+      continue;
+    }
+    const key = JSON.stringify([row.student_key, row.track, row.department.replace(/\s+/g, '')]);
+    if (!hansung.has(key)) hansung.set(key, []);
+    hansung.get(key).push({ row, sourceTrack: source.track });
+  }
+  const fields = ['first_stage', 'final_stage', 'waitlist', 'selection'];
+  for (const items of hansung.values()) {
+    const [a, b] = items;
+    if (items.length !== 2 || a.sourceTrack === b.sourceTrack ||
+      fields.some(field => a.row[field] && b.row[field] && a.row[field] !== b.row[field])) {
+      prepared.push(...items.map(item => item.row));
+      continue;
+    }
+    const merged = { ...(a.row.final_stage ? a.row : b.row) };
+    for (const field of fields) merged[field] = a.row[field] || b.row[field];
+    prepared.push(merged);
+  }
+  return prepared;
+}
+
 const collator = new Intl.Collator('ko', { numeric: true });
 const sortButtons = [...document.querySelectorAll('[data-sort]')];
 const defaultSort = [{ key: 'track', direction: 1 }, { key: 'name', direction: 1 }];
@@ -208,7 +248,7 @@ get('login').addEventListener('submit', async event => {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password })
     });
     const { rows } = await request('pages-data', { headers: { Authorization: 'Bearer ' + session } });
-    allRows = rows.map(row => ({ ...row, school: schoolInfo(row.university) }));
+    allRows = prepareRows(rows);
     selectUniversity();
     sortOrder = defaultSort;
     showRows(allRows);
