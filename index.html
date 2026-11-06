@@ -26,7 +26,6 @@ th button{background:transparent;color:inherit;border:0;padding:.15rem 0;text-al
 <div><dt>지원 인원</dt><dd id="applicants">–</dd></div>
 <div><dt>1차 합격 인원</dt><dd id="first-pass">–</dd></div>
 <div><dt>최종 합격 인원</dt><dd id="final-pass">–</dd></div>
-<div><dt>일괄합산 지원</dt><dd id="single-round">–</dd></div>
 </dl>
 </div>
 <p class="summary-note">현재 선택한 대학 기준입니다. 인원은 항목별로 학생당 한 번만 셉니다. 최종 합격에는 충원합격을 포함합니다.</p>
@@ -162,7 +161,6 @@ function renderSummary(rows) {
   get('applicants').textContent = count(rows);
   get('first-pass').textContent = count(rows.filter(row => !isSingleRound(row) && accepted(row.first_stage)));
   get('final-pass').textContent = count(rows.filter(row => accepted(row.final_stage)));
-  get('single-round').textContent = format(rows.filter(isSingleRound).length) + '건';
   const unknown = rows.filter(row => !row.selection).length;
   const conflicts = rows.filter(row => isSingleRound(row) && row.first_stage && row.first_stage !== '해당없음').length;
   get('selection-note').textContent = [
