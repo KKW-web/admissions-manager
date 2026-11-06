@@ -6,22 +6,25 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://ieum-admissions-2027-kkw.bboykw.chatgpt.site; base-uri 'none'; form-action 'none'">
 <title>2027 수시진학관리</title>
 <style>
-*{box-sizing:border-box}body{font:16px system-ui,sans-serif;margin:0;background:#f2f6fc;color:#14233e}main{max-width:1000px;margin:auto;padding:3rem 1rem}section,form{background:white;padding:1.5rem;border:1px solid #d6e2f2;border-radius:16px}form{max-width:460px}label{display:block;margin-bottom:.5rem}input,button{font:inherit;border:1px solid #8294af;border-radius:8px;padding:.6rem .8rem}button{background:#174ea6;color:white;cursor:pointer}button:disabled{opacity:.6}input{max-width:100%}p[role=status]{min-height:1.5em}#results>div{overflow:auto}table{width:100%;border-collapse:collapse;min-width:630px}th,td{text-align:left;padding:.7rem;border-bottom:1px solid #d6e2f2}th{background:#edf4ff}tbody tr:nth-child(even){background:#f8fbff}.pass{color:#14643f;font-weight:700}.fail{color:#9c2e36}.reserve{color:#754700}
+*{box-sizing:border-box}body{font:16px system-ui,sans-serif;margin:0;background:#f2f6fc;color:#14233e}main{max-width:1000px;margin:auto;padding:3rem 1rem}section,form{background:white;padding:1.5rem;border:1px solid #d6e2f2;border-radius:16px}form{max-width:460px}label{display:block;margin-bottom:.5rem}input,button,select{font:inherit;border:1px solid #8294af;border-radius:8px;padding:.6rem .8rem}button{background:#174ea6;color:white;cursor:pointer}button:disabled{opacity:.6}input{max-width:100%}p[role=status]{min-height:1.5em}#results>div{overflow:auto}table{width:100%;border-collapse:collapse;min-width:630px}th,td{text-align:left;padding:.7rem;border-bottom:1px solid #d6e2f2}th{background:#edf4ff}tbody tr:nth-child(even){background:#f8fbff}.pass{color:#14643f;font-weight:700}.fail{color:#9c2e36}.reserve{color:#754700}
 </style>
 <main>
 <header><p>교사용 조회</p><h1>2027 수시진학관리</h1></header>
 <form id="login">
-<h2>한성대 합불 조회</h2>
+<h2>전체 대학 합불 조회</h2>
 <label for="password">접속 비밀번호</label>
 <input id="password" type="password" inputmode="numeric" required autocomplete="current-password">
 <button id="unlock">결과 보기</button>
 </form>
 <p id="status" role="status"></p>
 <section id="results" hidden>
-<h2>한성대 지원 결과</h2>
-<p id="count"></p>
+<h2>전체 대학 지원 결과</h2>
+<label for="university">대학</label>
+<select id="university"><option value="">전체 대학</option></select>
+<p id="count" aria-live="polite"></p>
 <button id="lock" type="button">조회 종료</button>
-<div><table><thead><tr><th>학생</th><th>전형</th><th>모집단위</th><th>1차</th><th>최종</th></tr></thead><tbody id="rows"></tbody></table></div>
+<div><table><thead><tr><th>학생</th><th>대학</th><th>전형</th><th>모집단위</th><th>1차</th><th>최종</th></tr></thead><tbody id="rows"></tbody></table></div>
+<p><button id="previous" type="button">이전</button> <span id="page"></span> <button id="next" type="button">다음</button></p>
 </section>
 </main>
 <script>
@@ -33,22 +36,48 @@ async function request(path, options) {
   if (!reply.ok) throw new Error(body.error || '조회할 수 없습니다.');
   return body;
 }
-function render(rows) {
+let allRows = [];
+let filteredRows = [];
+let page = 0;
+const pageSize = 100;
+function selectUniversity() {
+  const select = get('university');
+  select.replaceChildren(new Option('전체 대학', ''));
+  const names = [...new Set(allRows.map(row => row.university).filter(Boolean))];
+  names.sort((a, b) => a.localeCompare(b, 'ko'));
+  for (const name of names) select.add(new Option(name, name));
+}
+get('university').addEventListener('change', event => {
+  const name = event.target.value;
+  showRows(name ? allRows.filter(row => row.university === name) : allRows);
+});
+function showRows(rows) {
+  filteredRows = rows;
+  page = 0;
+  render();
+}
+get('previous').addEventListener('click', () => { page--; render(); });
+get('next').addEventListener('click', () => { page++; render(); });
+function render() {
+  const pages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+  get('page').textContent = (page + 1) + ' / ' + pages;
+  get('previous').disabled = page === 0;
+  get('next').disabled = page + 1 >= pages;
   get('rows').replaceChildren();
-  for (const item of rows) {
+  for (const item of filteredRows.slice(page * pageSize, (page + 1) * pageSize)) {
     const row = get('rows').insertRow();
-    for (const value of [item.name, item.track, item.department, item.first_stage, item.final_stage]) {
+    for (const value of [item.name, item.university, item.track, item.department, item.first_stage, item.final_stage]) {
       const cell = row.insertCell();
       cell.textContent = value || '미입력';
       if (['합격', '충원합격'].includes(value)) cell.className = 'pass';
       if (value === '불합격') cell.className = 'fail';
       if (value === '예비') {
         cell.className = 'reserve';
-        if (row.cells.length === 5 && item.waitlist) cell.textContent += ' ' + item.waitlist + '번';
+        if (row.cells.length === 6 && item.waitlist) cell.textContent += ' ' + item.waitlist + '번';
       }
     }
   }
-  get('count').textContent = rows.length + '건';
+  get('count').textContent = filteredRows.length + '건';
 }
 get('login').addEventListener('submit', async event => {
   event.preventDefault();
@@ -61,7 +90,9 @@ get('login').addEventListener('submit', async event => {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password })
     });
     const { rows } = await request('pages-data', { headers: { Authorization: 'Bearer ' + session } });
-    render(rows);
+    allRows = rows;
+    selectUniversity();
+    showRows(allRows);
     get('login').hidden = true;
     get('results').hidden = false;
     get('lock').focus();
@@ -74,7 +105,9 @@ get('login').addEventListener('submit', async event => {
   }
 });
 get('lock').addEventListener('click', () => {
-  render([]);
+  allRows = [];
+  selectUniversity();
+  showRows(allRows);
   get('results').hidden = true;
   get('login').hidden = false;
   get('password').focus();
