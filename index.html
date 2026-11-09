@@ -3482,15 +3482,17 @@ window.addEventListener('message',async event=>{
  }
  if(msg.type==='admissions-editor-ready'&&!editorConnected){
   editorConnected=true;existingUser={role:'admin'};
+  sessionStorage.setItem('admissionsSession',JSON.stringify({token:'existing-cookie-session',expiresAt:Date.now()+14400000}));
+  if(elements.passwordDialog.open)elements.passwordDialog.close();
   document.getElementById('editorButton').textContent='수정 모드 종료';
   document.getElementById('editNotice').hidden=false;
-  try{await performSearch();}catch(e){showToast(e.message);}
+  try{await performSearch();}catch(e){toast(e.message,'error');}
  }
 });
 function openEditor(){
  if(editorConnected){editorConnected=false;existingUser={role:'viewer'};document.getElementById('editorButton').textContent='관리자 수정';document.getElementById('editNotice').hidden=true;location.reload();return;}
  editorNonce=crypto.randomUUID();editorPopup=window.open(editorOrigin+'/api/editor-connect#'+editorNonce,'admissions-editor','width=660,height=560');
- if(!editorPopup){showToast('관리자 연결 창의 팝업을 허용해 주세요.');return;}
+ if(!editorPopup){toast('관리자 연결 창의 팝업을 허용해 주세요.','error');return;}
 }
 document.getElementById('editorButton').addEventListener('click',openEditor);
 
@@ -6498,6 +6500,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
   </script>
 </body>
 </html>
+
 
 
 
