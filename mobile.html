@@ -3522,7 +3522,7 @@ window.addEventListener('message',async event=>{
 });
 function openEditor(){
  if(editorConnected){editorConnected=false;existingUser={role:'viewer'};document.getElementById('editorButton').textContent='관리자 수정';document.getElementById('editNotice').hidden=true;location.reload();return;}
- editorNonce=crypto.randomUUID();editorPopup=window.open(editorOrigin+'/api/editor-connect#'+editorNonce,'admissions-editor','width=660,height=560');
+ editorNonce=crypto.randomUUID();editorPopup=window.open(editorOrigin+'/api/editor-connect#'+editorNonce,'admissions-editor-'+editorNonce,'width=660,height=560');
  if(!editorPopup){toast('관리자 연결 창의 팝업을 허용해 주세요.','error');return;}
 }
 document.getElementById('editorButton').addEventListener('click',openEditor);
