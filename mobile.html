@@ -2240,6 +2240,7 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
  .inline-result-control:disabled{opacity:1!important;-webkit-text-fill-color:currentColor}
  #editNotice{background:#e1f0f1;color:#17324d;padding:12px;border-radius:10px}
  #editorButton{border:0;cursor:pointer;font:inherit;white-space:nowrap}
+ #editorButton[hidden]{display:none!important}
 </style>
 </head>
 <body class="mobile-edition">
@@ -2251,7 +2252,7 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
         
         <span class="brand-title">2027 수시진학관리</span>
       </div>
-      <div class="topbar-actions"><button class="edition-switch" id="editorButton" type="button">관리자 수정</button>
+      <div class="topbar-actions"><button class="edition-switch" id="editorButton" type="button" hidden>관리자 로그인</button>
         <a class="edition-switch pc-edition-link" href="https://kkw-web.github.io/admissions-manager/mobile.html" aria-label="모바일 버전으로 이동">
           <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M10 17h4"/></svg>
           <span>모바일 버전</span>
@@ -3497,6 +3498,8 @@ async function existingApi(action, payload={}) {
 
 
 let editorPopup=null,editorNonce='',editorConnected=false;
+const adminEntry=new URLSearchParams(location.search).get('admin')==='1';
+document.getElementById('editorButton').hidden=!adminEntry;
 const editorPending=new Map();
 const editorOrigin='https://ieum-admissions-2027-kkw.bboykw.chatgpt.site';
 function editorRequest(action,body){return new Promise((resolve,reject)=>{
@@ -3515,17 +3518,20 @@ window.addEventListener('message',async event=>{
   editorConnected=true;existingUser={role:'admin'};
   sessionStorage.setItem('admissionsSession',JSON.stringify({token:'existing-cookie-session',expiresAt:Date.now()+14400000}));
   if(elements.passwordDialog.open)elements.passwordDialog.close();
+  document.getElementById('editorButton').hidden=false;
   document.getElementById('editorButton').textContent='수정 모드 종료';
   document.getElementById('editNotice').hidden=false;
   try{await performSearch();}catch(e){toast(e.message,'error');}
  }
 });
 function openEditor(){
+ if(!adminEntry&&!editorConnected)return;
  if(editorConnected){editorConnected=false;existingUser={role:'viewer'};document.getElementById('editorButton').textContent='관리자 수정';document.getElementById('editNotice').hidden=true;location.reload();return;}
  editorNonce=crypto.randomUUID();editorPopup=window.open(editorOrigin+'/api/editor-connect#'+editorNonce,'admissions-editor-'+editorNonce,'width=660,height=560');
  if(!editorPopup){toast('관리자 연결 창의 팝업을 허용해 주세요.','error');return;}
 }
 document.getElementById('editorButton').addEventListener('click',openEditor);
+
 
     async function api(action, payload = {}, options = {}) {
       if (!DEMO_MODE) return existingApi(action, payload);
