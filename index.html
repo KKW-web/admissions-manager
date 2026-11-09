@@ -1091,24 +1091,19 @@
       animation: saving-spin .7s linear infinite;
     }
     @keyframes saving-spin { to { transform: rotate(360deg); } }
-    .result-table :is(th, td):nth-child(1) { width: 72px; }
-    .result-table :is(th, td):nth-child(2) { width: 39px; }
-    .result-table :is(th, td):nth-child(3) { width: 42px; }
-    .result-table :is(th, td):nth-child(4) { width: 76px; }
-    .result-table :is(th, td):nth-child(5) { width: 112px; }
-    .result-table :is(th, td):nth-child(6) { width: 52px; }
-    .result-table :is(th, td):nth-child(7) { width: 62px; }
-    .result-table :is(th, td):nth-child(8) { width: 134px; }
-    .result-table :is(th, td):nth-child(9) { width: 134px; }
-    .result-table :is(th, td):nth-child(10) { width: 92px; }
-    .result-table :is(th, td):nth-child(11) { width: 116px; }
-    .result-table :is(th, td):nth-child(12),
-    .result-table :is(th, td):nth-child(13) { width: 90px; }
-    .result-table :is(th, td):nth-child(14) { width: 103px; }
-    .result-table :is(th, td):nth-child(15) { width: 96px; }
-    .sort-button[data-sort-key="waitPrediction"] { gap: 3px; padding-inline: 3px; font-size: 12px; }
-    .result-table :is(th, td):nth-child(16),
-    .result-table :is(th, td):nth-child(17) { width: 82px; }
+    .result-table :is(th,td)[data-column="enrollment"] { width:72px; }
+    .result-table :is(th,td)[data-column="classNo"], .result-table :is(th,td)[data-column="studentNo"] { width:44px; }
+    .result-table :is(th,td)[data-column="name"] { width:90px; }
+    .result-table :is(th,td)[data-column="university"] { width:150px; }
+    .result-table :is(th,td)[data-column="campus"] { width:180px; }
+    .result-table :is(th,td)[data-column="track"] { width:60px; }
+    .result-table :is(th,td)[data-column="admissionType"] { width:125px; }
+    .result-table :is(th,td)[data-column="admissionName"] { width:230px; }
+    .result-table :is(th,td)[data-column="recruitmentUnit"] { width:190px; }
+    .result-table :is(th,td)[data-column="reviewReason"] { width:320px; }
+    .result-table :is(th,td)[data-column="stage1"], .result-table :is(th,td)[data-column="finalResult"], .result-table :is(th,td)[data-column="firstWait"] { width:100px; }
+    .result-table td:is([data-column="university"],[data-column="campus"],[data-column="admissionName"],[data-column="recruitmentUnit"],[data-column="admissionType"]) { white-space:normal; overflow:visible; text-overflow:clip; overflow-wrap:anywhere; line-height:1.6; }
+    .card-university, .meta-row span { white-space:normal; overflow:visible; text-overflow:clip; overflow-wrap:anywhere; }
     .result-table th:nth-child(n+12) {
       background: linear-gradient(180deg, rgba(241,250,252,.82), rgba(191,226,234,.72));
     }
@@ -2338,6 +2333,7 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
               <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h7M15 6h5M4 12h3M11 12h9M4 18h10M18 18h2"/><circle cx="13" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></svg>
               <span>추가 옵션</span>
             </button>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#176b73;font-weight:700"><input id="reviewOnly" type="checkbox" style="width:18px;height:18px">검토 필요만 보기</label>
             <button id="clearButton" class="ghost-button clear-button" type="button">
               <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v6h6"/><path d="M5.5 15a7 7 0 1 0 1-7"/></svg>
               <span>초기화</span>
@@ -2613,7 +2609,7 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
       { key: 'name', label: '성명' },
       { key: 'university', label: '대학명' },
       { key: 'campus', label: '원본 대학·캠퍼스' },
-      { key: 'duplicateNote', label: '원본 검토' },
+      { key: 'reviewReason', label: '부족한 정보 · 확인할 내용' },
       { key: 'track', label: '계열' },
       { key: 'admissionType', label: '전형유형' },
       { key: 'admissionName', label: '전형명' },
@@ -2641,7 +2637,7 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
     const RESULT_KEYS = Object.freeze(Object.keys(RESULT_DEFINITIONS));
     const FILTER_KEYS = Object.freeze([
       'university', 'name', 'admissionName', 'recruitmentUnit', 'universityType',
-      'enrollment', 'classNo', 'admissionType', 'includeCampuses',
+      'enrollment', 'classNo', 'admissionType', 'includeCampuses', 'reviewOnly',
     ]);
 
     const state = {
@@ -3403,7 +3399,15 @@ async function existingRequest(path, body) {
 }
 function existingRecord(row) {
   const d=row.details || {};
+  const reviewRequired=Boolean(row.duplicateNote&&!/통합$/.test(row.duplicateNote));
+  const absent=value=>!value||['자료 미기재','미입력'].includes(value);
+  const missing=[absent(row.track)?'전형명':'',absent(row.department)?'모집단위(학과)':''].filter(Boolean);
+  const reason=!reviewRequired?'':(missing.length?'부족: '+missing.join(' · ')+'. ':'')+
+    (row.duplicateNote.includes('보완 자료 없음')?'같은 학생·대학의 보완 원본이 없습니다. 원서 접수내역을 확인해 주세요.':
+    row.duplicateNote.includes('전형 미기재')?'전형을 특정할 수 없어 통합을 보류했습니다. 접수내역의 전형명·학과를 확인해 주세요.':
+    '다른 원본과 전형·학과 또는 결과가 일치하는지 확인해 주세요.');
   return {
+    reviewRequired,reviewReason:reason,
     id:String(row.id), version:String(row.version), rowNumber:row.id,
     studentKey:row.student_id, universityType:d.school_type || '',
     enrollment:row.status, classNo:String(row.classroom || ''), studentNo:String(row.number || ''),
@@ -3418,6 +3422,7 @@ function existingRecord(row) {
 function existingFilter(rows, filters={}) {
   const text=value=>String(value || '').normalize('NFKC').replace(/\s/g,'').toLocaleLowerCase('ko');
   return rows.filter(row=>Object.entries(filters).every(([key,value])=>{
+    if(key==='reviewOnly')return !value||row.reviewRequired===true;
     if(key==='includeCampuses' || !value)return true;
     if(['classNo','enrollment','universityType','admissionType'].includes(key))return String(row[key] || '')===String(value);
     return text(row[key]).includes(text(value));
@@ -3487,6 +3492,7 @@ async function existingApi(action, payload={}) {
   if(action==='revision'||action==='health')return base;
   throw new ApiError('VALIDATION_ERROR','지원하지 않는 작업입니다.');
 }
+
 
 
 
@@ -3600,6 +3606,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
         classNo: elements.classSelect.value,
         admissionType: elements.admissionTypeSelect.value,
         includeCampuses: Boolean(elements.includeCampusesToggle.checked),
+        reviewOnly: $('reviewOnly').checked,
       };
     }
 
@@ -3608,7 +3615,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
     }
 
     function searchCacheKey(filters) {
-      return JSON.stringify(FILTER_KEYS.map(key => key === 'includeCampuses'
+      return JSON.stringify(FILTER_KEYS.map(key => ['includeCampuses','reviewOnly'].includes(key)
         ? Boolean(filters && filters[key])
         : String(filters && filters[key] || '').trim()));
     }
@@ -4279,8 +4286,9 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
       elements.cardList.replaceChildren();
       elements.tableHead.replaceChildren();
       const headFragment = document.createDocumentFragment();
-      COLUMNS.forEach(column => {
+      COLUMNS.filter(column=>column.key!=='reviewReason'||state.lastFilters?.reviewOnly).forEach(column => {
         const th = makeElement('th');
+        th.dataset.column=column.key;
         const active = state.sortKey === column.key;
         th.setAttribute('aria-sort', active ? (state.sortDirection === 'asc' ? 'ascending' : 'descending') : 'none');
         const button = makeElement('button', '', 'sort-button');
@@ -4304,9 +4312,10 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
       const bodyFragment = document.createDocumentFragment();
       records.forEach(record => {
         const tr = makeElement('tr');
-        COLUMNS.forEach(column => {
+        COLUMNS.filter(column=>column.key!=='reviewReason'||state.lastFilters?.reviewOnly).forEach(column => {
           if (column.result) {
             const td = makeElement('td', '', `cell-result cell-result-${column.key}`);
+            td.dataset.column=column.key;
             const field = makeInlineResultField(record, column.key, false, false);
             if (field.classList.contains('is-filled')) td.classList.add('is-filled');
             if (field.classList.contains('is-locked')) td.classList.add('is-locked');
@@ -4327,6 +4336,8 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
           if (column.key === 'admissionName') td.className = 'cell-admission';
           if (column.key === 'recruitmentUnit') td.className = 'cell-recruitment-unit';
           if (column.key === 'university') td.className = 'cell-university';
+          if(column.key==='reviewReason'){td.style.cssText='min-width:280px;max-width:380px;white-space:normal;line-height:1.6;color:#945300';}
+          td.dataset.column=column.key;
           td.title = value === '-' ? '' : value;
           if (['name', 'birthdate', 'examNo'].includes(column.key)) {
             td.append(makeCopyValue(value, column.label));
@@ -4378,6 +4389,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
           metaRow('모집단위', record.recruitmentUnit, true)
         );
 
+        if(state.lastFilters?.reviewOnly)meta.append(metaRow('부족한 정보 · 확인할 내용',record.reviewReason,true));
         const inlineResults = makeElement('div', '', 'card-inline-results');
         ['stage1', 'finalResult', 'firstWait'].forEach(key => {
           inlineResults.append(makeInlineResultField(record, key, true, false));
@@ -4788,7 +4800,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
       };
       const normalized = {};
       FILTER_KEYS.forEach(key => {
-        normalized[key] = key === 'includeCampuses'
+        normalized[key] = ['includeCampuses','reviewOnly'].includes(key)
           ? Boolean(migrated[key])
           : String(migrated[key] || '');
       });
@@ -4898,6 +4910,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
       elements.classSelect.value = values.classNo;
       elements.admissionTypeSelect.value = values.admissionType;
       elements.includeCampusesToggle.checked = Boolean(values.includeCampuses);
+      $('reviewOnly').checked=Boolean(values.reviewOnly);
     }
 
     function resumeRecoveredDrafts() {
@@ -5561,6 +5574,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
         const text = String(value || '').trim();
         if (text && !parts.includes(text)) parts.push(text);
       };
+      add(filters.reviewOnly?'검토 필요만':'');
       add(filters.enrollment);
       add(filters.classNo ? `${filters.classNo}반` : '');
       add(filters.name);
@@ -6282,6 +6296,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
       elements.detailToggle.addEventListener('click', () => toggleDetails());
       elements.mobileDetailButton.addEventListener('click', () => toggleDetails());
       elements.clearButton.addEventListener('click', resetSearch);
+      $('reviewOnly').addEventListener('change',()=>performSearch({silent:false,manual:true}));
       elements.scheduleGrid.addEventListener('click', event => {
         const button = event.target.closest('[data-schedule-category]');
         if (button) openScheduleDialog(button.dataset.scheduleCategory, button);
