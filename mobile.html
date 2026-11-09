@@ -3348,6 +3348,12 @@ function trackInfo(value,university){
 }
 function campusOf(value){const x=compact(value);const m=x.match(/\(([^)]+)\)/);return m?m[1]:x.includes('글로컬')?'글로컬':x.includes('ERICA')?'ERICA':x.includes('경주캠퍼스')?'WISE':'';}
 function meaningful(v){return v!==undefined&&v!==null&&v!==''&&!['미입력','자료 미기재'].includes(v);}
+function departmentKey(value,school){
+ const key=compact(value);
+ // Explicit official-program alias only: do not collapse arbitrary department prefixes.
+ if(school==='광운대학교'&&key==='반도체시스템공학부반도체시스템공학전공')return '반도체시스템공학부';
+ return key;
+}
 function prepareRows(rows){
  // Fill only a missing department when an explicitly named track has one
  // reciprocal counterpart. Never infer an application from student/school alone.
@@ -3375,7 +3381,7 @@ function prepareRows(rows){
    const peers=rows.filter(other=>other!==source&&other.student_key===source.student_key&&schoolInfo(other.university).name===row.school.name);
    row.review=!peers.length?'원본 대조 완료 · 보완 자료 없음':!meaningful(source.track)?'원본 전형 미기재 · 통합 보류':'원본 대조 완료 · 전형/학과 확인 필요';out.push(row);continue;
   }
-  const key=JSON.stringify([source.student_key,row.school.name,t.key,compact(source.department)]);
+  const key=JSON.stringify([source.student_key,row.school.name,t.key,departmentKey(source.department,row.school.name)]);
   if(!groups.has(key))groups.set(key,[]);groups.get(key).push(row);
  }
  for(const items of groups.values()){
