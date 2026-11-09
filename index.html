@@ -2366,7 +2366,7 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
     <section id="todaySchedule" class="today-schedule glass-panel" aria-labelledby="todayScheduleTitle">
       <button id="mobileScheduleOpenButton" class="mobile-schedule-open" type="button" aria-haspopup="dialog" aria-controls="scheduleDialog">
         <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="M8 14h2M14 14h2M8 18h2"/></svg>
-        <span>오늘의 일정 보기</span>
+        <span id="mobileScheduleLabel">오늘의 일정 보기</span>
         <span id="mobileScheduleCount" class="mobile-schedule-count"></span>
         <svg class="mobile-schedule-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
       </button>
@@ -2884,9 +2884,10 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
         0
       );
       elements.mobileScheduleCount.textContent = `${totalEntries}건`;
+      $('mobileScheduleLabel').textContent = `${selectedScheduleDate ? '선택일' : '오늘'}의 일정 보기`;
       elements.mobileScheduleOpenButton.setAttribute(
         'aria-label',
-        `오늘의 일정 보기 ${totalEntries}건`
+        `${selectedScheduleDate ? '선택일' : '오늘'}의 일정 보기 ${totalEntries}건`
       );
 
       SCHEDULE_CATEGORIES.forEach(category => {
@@ -2984,7 +2985,7 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
       );
       state.scheduleDialogTrigger = trigger instanceof HTMLElement ? trigger : null;
       elements.scheduleDialogList.classList.add('is-overview');
-      elements.scheduleDialogTitle.textContent = '오늘의 대입 일정';
+      elements.scheduleDialogTitle.textContent = selectedScheduleDate ? '선택일의 대입 일정' : '오늘의 대입 일정';
       elements.scheduleDialogIcon.replaceChildren(makeScheduleCategoryIcon('calendar'));
       elements.scheduleDialogMeta.textContent = scheduleDateLabel(currentScheduleDateKey());
       elements.scheduleDialogCount.textContent = `${total}건`;
