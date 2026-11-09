@@ -2610,6 +2610,7 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
       { key: 'university', label: '대학명' },
       { key: 'campus', label: '원본 대학·캠퍼스' },
       { key: 'reviewReason', label: '부족한 정보 · 확인할 내용' },
+      { key: 'reviewEdit', label: '지원정보 수정' },
       { key: 'track', label: '계열' },
       { key: 'admissionType', label: '전형유형' },
       { key: 'admissionName', label: '전형명' },
@@ -3349,11 +3350,11 @@ const pagesBase = 'https://ieum-admissions-2027-kkw.bboykw.chatgpt.site/api/';
 async function pagesRequest(path, body) {
   if(typeof editorConnected!=='undefined'&&editorConnected){
     if(path==='me')return editorRequest('me');
-    if(path==='result')return editorRequest('result',body);
+    if(['result','review'].includes(path))return editorRequest(path,body);
     if(path==='data'){
       const data=await editorRequest('data');
       const flat=data.rows.map(r=>({...r,student_key:r.student_id,...r.details}));
-      return {rows:prepareRows(flat).map(r=>({...r,university:r.school.name,originalUniversity:r.university,details:{...r.details,waitlist:r.waitlist,selection:r.selection},sourceRefs:r.sources.map(s=>({id:s.id,version:s.version})),duplicateNote:r.review}))};
+      return {rows:prepareRows(flat).map(r=>({...r,university:r.school.name,originalUniversity:r.university,details:{...r.details,waitlist:r.waitlist,selection:r.selection},sourceRefs:r.sources.map(s=>({id:s.id,version:s.version})),duplicateNote:r.review,reviewDone:r.sources.every(s=>s.review_done===true)}))};
     }
   }
   if (path === 'me') {
@@ -3377,7 +3378,7 @@ async function pagesRequest(path, body) {
     ...row,id:index+1,version:1,student_id:row.student_key,
     university:row.school.name,
     details:{selection:row.selection,waitlist:row.waitlist,field:row.field,track_type:row.track_type,school_type:row.school_type},
-    originalUniversity:row.university,duplicateNote:row.review,sourceRefs:row.sources.map(s=>({id:s.id,version:s.version}))
+    originalUniversity:row.university,duplicateNote:row.review,reviewDone:row.sources.every(s=>s.review_done===true),sourceRefs:row.sources.map(s=>({id:s.id,version:s.version}))
   }))};
 }
 let existingUser = null;
@@ -3399,7 +3400,7 @@ async function existingRequest(path, body) {
 }
 function existingRecord(row) {
   const d=row.details || {};
-  const reviewRequired=Boolean(row.duplicateNote&&!/통합$/.test(row.duplicateNote));
+  const reviewRequired=Boolean(!row.reviewDone&&row.duplicateNote&&!/통합$/.test(row.duplicateNote));
   const absent=value=>!value||['자료 미기재','미입력'].includes(value);
   const missing=[absent(row.track)?'전형명':'',absent(row.department)?'모집단위(학과)':''].filter(Boolean);
   const reason=!reviewRequired?'':(missing.length?'부족: '+missing.join(' · ')+'. ':'')+
@@ -3407,7 +3408,7 @@ function existingRecord(row) {
     row.duplicateNote.includes('전형 미기재')?'전형을 특정할 수 없어 통합을 보류했습니다. 접수내역의 전형명·학과를 확인해 주세요.':
     '다른 원본과 전형·학과 또는 결과가 일치하는지 확인해 주세요.');
   return {
-    reviewRequired,reviewReason:reason,
+    reviewRequired,reviewReason:reason,reviewDone:row.reviewDone===true,
     id:String(row.id), version:String(row.version), rowNumber:row.id,
     studentKey:row.student_id, universityType:d.school_type || '',
     enrollment:row.status, classNo:String(row.classroom || ''), studentNo:String(row.number || ''),
@@ -3492,7 +3493,6 @@ async function existingApi(action, payload={}) {
   if(action==='revision'||action==='health')return base;
   throw new ApiError('VALIDATION_ERROR','지원하지 않는 작업입니다.');
 }
-
 
 
 
@@ -4286,7 +4286,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
       elements.cardList.replaceChildren();
       elements.tableHead.replaceChildren();
       const headFragment = document.createDocumentFragment();
-      COLUMNS.filter(column=>column.key!=='reviewReason'||state.lastFilters?.reviewOnly).forEach(column => {
+      COLUMNS.filter(column=>(column.key!=='reviewReason'||state.lastFilters?.reviewOnly)&&(column.key!=='reviewEdit'||existingUser?.role==='admin')).forEach(column => {
         const th = makeElement('th');
         th.dataset.column=column.key;
         const active = state.sortKey === column.key;
@@ -4312,7 +4312,8 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
       const bodyFragment = document.createDocumentFragment();
       records.forEach(record => {
         const tr = makeElement('tr');
-        COLUMNS.filter(column=>column.key!=='reviewReason'||state.lastFilters?.reviewOnly).forEach(column => {
+        COLUMNS.filter(column=>(column.key!=='reviewReason'||state.lastFilters?.reviewOnly)&&(column.key!=='reviewEdit'||existingUser?.role==='admin')).forEach(column => {
+          if(column.key==='reviewEdit'){const td=makeElement('td');td.append(makeReviewEditButton(record));tr.append(td);return;}
           if (column.result) {
             const td = makeElement('td', '', `cell-result cell-result-${column.key}`);
             td.dataset.column=column.key;
@@ -4395,9 +4396,39 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
           inlineResults.append(makeInlineResultField(record, key, true, false));
         });
         card.append(primary, keys, meta, inlineResults);
+        if(existingUser?.role==='admin')card.append(makeReviewEditButton(record));
         fragment.append(card);
       });
       elements.cardList.append(fragment);
+    }
+
+    function makeReviewEditButton(record){
+      const button=makeElement('button',record.reviewDone?'확인 완료 · 수정':'정보 수정','ghost-button');button.type='button';
+      button.addEventListener('click',()=>openReviewEditor(record));return button;
+    }
+    function openReviewEditor(record){
+      if(existingUser?.role!=='admin')return;
+      if(hasActiveInlineWork()){toast('결과 저장이 끝난 뒤 정보를 수정해 주세요.','error');return;}
+      const dialog=document.createElement('dialog');dialog.style.cssText='max-width:520px;width:90%;border:0;border-radius:16px;padding:28px;color:#17324d';
+      const form=document.createElement('form');form.method='dialog';
+      form.append(makeElement('h2',record.name+' · 지원정보 수정'));
+      if(record.reviewReason)form.append(makeElement('p',record.reviewReason));
+      const fields={};for(const [key,title,value] of [['track','전형명',record.admissionName],['department','모집단위(학과)',record.recruitmentUnit]]){
+        const label=document.createElement('label');label.style.cssText='display:block;margin:16px 0';label.textContent=title;
+        const input=document.createElement('input');input.type='text';input.required=true;input.maxLength=200;input.value=value==='자료 미기재'?'':value||'';input.style.cssText='display:block;width:100%;padding:10px;margin-top:6px';label.append(input);form.append(label);fields[key]=input;
+      }
+      const label=document.createElement('label'),done=document.createElement('input');done.type='checkbox';done.checked=record.reviewDone;label.append(done,document.createTextNode(' 정보 확인 완료'));form.append(label);
+      form.append(makeElement('p','합불 결과와 예비번호는 변경되지 않습니다.'));
+      const error=makeElement('p');error.setAttribute('role','alert');form.append(error);
+      const save=makeElement('button','저장','search-button');save.type='submit';
+      const cancel=makeElement('button','취소','ghost-button');cancel.type='button';cancel.onclick=()=>dialog.close();form.append(save,cancel);
+      const original=existingRows.find(r=>String(r.id)===String(record.id));
+      const refs=original?.sourceRefs||[{id:Number(record.id),version:Number(record.version)}];
+      form.addEventListener('submit',async e=>{e.preventDefault();save.disabled=true;cancel.disabled=true;error.textContent='저장 중';
+        try{await existingRequest('review',{items:refs,changes:{track:fields.track.value.trim(),department:fields.department.value.trim(),review_done:done.checked}});state.searchCache?.clear();dialog.close();await performSearch({silent:false,manual:true});toast('지원정보를 저장했습니다.');}
+        catch(e){error.textContent=e.message+' 창을 닫고 다시 조회한 뒤 확인해 주세요.';}finally{save.disabled=false;cancel.disabled=false;}
+      });
+      dialog.addEventListener('close',()=>dialog.remove());dialog.append(form);document.body.append(dialog);dialog.showModal();
     }
 
     function keyData(label, value) {
