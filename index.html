@@ -3384,7 +3384,10 @@ async function existingApi(action, payload={}) {
   const data=await existingRequest('data');
   existingRows=data.rows;
   const records=existingRows.map(existingRecord);
-  const revision=JSON.stringify(existingRows.map(row=>[row.id,row.version,row.first_stage,row.final_stage,row.details]));
+  const fingerprint=JSON.stringify(existingRows);
+  let hash=2166136261;
+  for(let i=0;i<fingerprint.length;i++)hash=Math.imul(hash^fingerprint.charCodeAt(i),16777619)>>>0;
+  const revision=existingRows.length+'-'+fingerprint.length+'-'+hash.toString(16);
   const base={ok:true,revision,sourceRevision:revision,serverTime:new Date().toISOString()};
   if(action==='save'){
     if(existingUser.role!=='admin')throw new ApiError('FORBIDDEN','관리자 로그인 후 수정할 수 있습니다.');
@@ -3415,6 +3418,10 @@ async function existingApi(action, payload={}) {
     const options={};
     const keys={universityTypes:'universityType',enrollments:'enrollment',classes:'classNo',tracks:'track',admissionTypes:'admissionType',universities:'university',names:'name',admissionNames:'admissionName',recruitmentUnits:'recruitmentUnit'};
     for(const [key,field] of Object.entries(keys))options[key]=[...new Set(records.map(row=>row[field]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko',{numeric:true}));
+    for(const [relation,field,list] of [['admissionNameIndexesByUniversity','admissionName','admissionNames'],['recruitmentUnitIndexesByUniversity','recruitmentUnit','recruitmentUnits']]){
+      const indexes=new Map(options[list].map((value,index)=>[value,index]));
+      options[relation]=options.universities.map(university=>[...new Set(records.filter(row=>row.university===university).map(row=>indexes.get(row[field])).filter(index=>index!==undefined))]);
+    }
     return {...base,options};
   }
   if(action==='universities')return {...base,suggestions:[...new Set(records.map(row=>row.university))].filter(value=>value.includes(payload.query || ''))};
@@ -3430,6 +3437,7 @@ async function existingApi(action, payload={}) {
   if(action==='revision'||action==='health')return base;
   throw new ApiError('VALIDATION_ERROR','지원하지 않는 작업입니다.');
 }
+
 
 
     async function api(action, payload = {}, options = {}) {
@@ -6433,6 +6441,7 @@ async function existingApi(action, payload={}) {
   </script>
 </body>
 </html>
+
 
 
 
