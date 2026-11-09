@@ -2237,6 +2237,14 @@
     .results-section{overflow-x:auto}
 
 body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 28px);margin-top:0;min-height:0;justify-content:flex-start} .field label{color:#476070} input,select{background:#f5f8fa!important;color:#17324d} input::placeholder{color:#71828d} .edition-switch{background:#edf7f8} .loading-toast{background:#176b72}
+
+ .inline-result-control[data-outcome="pass"]{background:#dcfce7!important;color:#166534!important;border:1px solid #86efac!important}
+ .inline-result-control[data-outcome="fail"]{background:#fee2e2!important;color:#991b1b!important;border:1px solid #fca5a5!important}
+ .inline-result-control[data-outcome="wait"]{background:#ffedd5!important;color:#9a3412!important;border:1px solid #fdba74!important}
+ .inline-result-control[data-outcome="unknown"]{background:#f1f5f9!important;color:#64748b!important}
+ .inline-result-control:disabled{opacity:1!important;-webkit-text-fill-color:currentColor}
+ #editNotice{background:#e1f0f1;color:#17324d;padding:12px;border-radius:10px}
+ #editorButton{border:0;cursor:pointer;font:inherit;white-space:nowrap}
 </style>
 </head>
 <body class="pc-edition">
@@ -2248,7 +2256,7 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
         
         <span class="brand-title">2027 수시진학관리</span>
       </div>
-      <div class="topbar-actions">
+      <div class="topbar-actions"><button class="edition-switch" id="editorButton" type="button">관리자 수정</button>
         <a class="edition-switch pc-edition-link" href="https://kkw-web.github.io/admissions-manager/mobile.html" aria-label="모바일 버전으로 이동">
           <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M10 17h4"/></svg>
           <span>모바일 버전</span>
@@ -2271,7 +2279,7 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
     </div>
   </header>
 
-  <main>
+  <main><p id="editNotice" hidden>수정 모드 · 결과 선택 시 자동 저장됩니다. 통합 표시된 원본은 함께 반영하며, 다른 항목은 유지합니다.</p>
     <section class="search-panel glass-panel" aria-label="검색">
       <button id="mobileSearchSummary" class="mobile-search-summary" type="button" aria-expanded="false" aria-controls="searchForm">
         <svg class="summary-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
@@ -2557,7 +2565,7 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
     const FULL_SYNC_INTERVAL_MS = 45000;
     const INITIAL_PAGE_SIZE = 13;
     const MORE_PAGE_SIZE = 10;
-    const DEFAULT_SORT_KEY = 'admissionName';
+    const DEFAULT_SORT_KEY = 'enrollment';
     const DEFAULT_SORT_DIRECTION = 'asc';
     const PENDING_DRAFTS_KEY = `admissionsPendingDraftsV1:${EDITION}`;
     const PENDING_DRAFT_TTL_MS = 3 * 60 * 60 * 1000;
@@ -2605,6 +2613,7 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
       { key: 'name', label: '성명' },
       { key: 'university', label: '대학명' },
       { key: 'campus', label: '원본 대학·캠퍼스' },
+      { key: 'duplicateNote', label: '원본 검토' },
       { key: 'track', label: '계열' },
       { key: 'admissionType', label: '전형유형' },
       { key: 'admissionName', label: '전형명' },
@@ -3270,46 +3279,62 @@ const hansungTracks = new Map([
   ['학생부교과(지역균형-수능 최저학력기준 미적용)', '지역균형'],
   ['학생부교과(교과우수-수능 최저학력기준 적용)', '교과우수']
 ]);
-function prepareRows(rows) {
-  const prepared = [];
-  const hansung = new Map();
-  for (const source of rows) {
-    const row = { ...source, school: schoolInfo(source.university) };
-    if (row.school.name !== '한성대학교') {
-      prepared.push(row);
-      continue;
-    }
-    row.track = hansungTracks.get(source.track) || source.track;
-    if (row.student_key == null || !row.track || !row.department) {
-      prepared.push(row);
-      continue;
-    }
-    const key = JSON.stringify([row.student_key, row.track, row.department.replace(/\s+/g, '')]);
-    if (!hansung.has(key)) hansung.set(key, []);
-    hansung.get(key).push({ row, sourceTrack: source.track });
-  }
-  const fields = ['first_stage', 'final_stage', 'waitlist', 'selection'];
-  for (const items of hansung.values()) {
-    const [a, b] = items;
-    if (items.length !== 2 || a.sourceTrack === b.sourceTrack ||
-      fields.some(field => a.row[field] && b.row[field] && a.row[field] !== b.row[field])) {
-      prepared.push(...items.map(item => item.row));
-      continue;
-    }
-    const merged = { ...(a.row.final_stage ? a.row : b.row) };
-    for (const field of fields) merged[field] = a.row[field] || b.row[field];
-    prepared.push(merged);
-  }
-  return prepared;
+
+function compact(value){return String(value||'').normalize('NFKC').replace(/\s+/g,'');}
+function trackInfo(value,university){
+ let t=compact(value),kind='';
+ const match=t.match(/^(학생부위주\((교과|종합)\)-?|학생부(교과|종합)(전형)?|교과-|종합-|학종)/);
+ if(match){kind=match[2]||match[3]||(match[0].includes('교과')?'교과':'종합');t=t.slice(match[0].length);}
+ if(/^논술/.test(t))kind='논술';
+ if(/^실기/.test(t))kind='실기';
+ if(university==='한성대학교')t=compact(hansungTracks.get(value)||t);
+ if(university==='광운대학교')t=t.replace('광운참빛인재전형I-면접형','광운참빛인재전형-면접형').replace('광운참빛인재전형II-서류형','광운참빛인재전형-서류형');
+ if(university==='경동대학교')t=t.replace('(수시)','');
+ // Remove only presentation wrappers. Retain I/II, interview/document and minimum-score distinctions.
+ t=t.replace(/^논술위주/,'').replace(/^논술(?=\()/,'').replace(/^실기(?=\()/,'');
+ t=t.replace(/[()[\]{}·ㆍ\-]/g,'').replace(/전형/g,'');
+ return {key:t,kind};
 }
-
-
+function campusOf(value){const x=compact(value);const m=x.match(/\(([^)]+)\)/);return m?m[1]:x.includes('글로컬')?'글로컬':x.includes('ERICA')?'ERICA':x.includes('경주캠퍼스')?'WISE':'';}
+function meaningful(v){return v!==undefined&&v!==null&&v!==''&&!['미입력','자료 미기재'].includes(v);}
+function prepareRows(rows){
+ const groups=new Map();const out=[];
+ for(const source of rows){
+  const row={...source,school:schoolInfo(source.university),sources:[source],review:''};
+  const t=trackInfo(source.track,row.school.name);row.trackKind=t.kind;
+  if(source.student_key==null||!meaningful(source.track)||!meaningful(source.department)){
+   row.review='전형·학과 확인 필요';out.push(row);continue;
+  }
+  const key=JSON.stringify([source.student_key,row.school.name,t.key,compact(source.department)]);
+  if(!groups.has(key))groups.set(key,[]);groups.get(key).push(row);
+ }
+ for(const items of groups.values()){
+  if(items.length===1){out.push(items[0]);continue;}
+  const knownKinds=new Set(items.map(r=>r.trackKind).filter(Boolean));
+  const campuses=new Set(items.map(r=>campusOf(r.university)).filter(Boolean));
+  const conflict=['first_stage','final_stage','waitlist','selection','exam','registration'].some(key=>new Set(items.map(r=>r[key]).filter(meaningful).map(compact)).size>1);
+  if(knownKinds.size>1||campuses.size>1||conflict){for(const row of items){row.review=conflict?'결과·정보 충돌':campuses.size>1?'캠퍼스 구분':'전형 유형 확인';out.push(row);}continue;}
+  const merged={...items[0],sources:items.flatMap(r=>r.sources),review:''};
+  for(const row of items)for(const [key,value] of Object.entries(row))if(!meaningful(merged[key])&&meaningful(value))merged[key]=value;
+  merged.review='원본 '+items.length+'건 통합';out.push(merged);
+ }
+ return out;
+}
 
 // Same-origin adapter for the existing admissions server. No database migration.
 let pagesToken = '';
 const pagesMode = location.hostname === 'kkw-web.github.io';
 const pagesBase = 'https://ieum-admissions-2027-kkw.bboykw.chatgpt.site/api/';
 async function pagesRequest(path, body) {
+  if(typeof editorConnected!=='undefined'&&editorConnected){
+    if(path==='me')return editorRequest('me');
+    if(path==='result')return editorRequest('result',body);
+    if(path==='data'){
+      const data=await editorRequest('data');
+      const flat=data.rows.map(r=>({...r,student_key:r.student_id,...r.details}));
+      return {rows:prepareRows(flat).map(r=>({...r,university:r.school.name,originalUniversity:r.university,details:{...r.details,waitlist:r.waitlist,selection:r.selection},sourceRefs:r.sources.map(s=>({id:s.id,version:s.version})),duplicateNote:r.review}))};
+    }
+  }
   if (path === 'me') {
     if (!pagesToken) throw new ApiError('UNAUTHENTICATED','접속 비밀번호를 입력해 주세요.');
     return {role:'viewer'};
@@ -3331,7 +3356,7 @@ async function pagesRequest(path, body) {
     ...row,id:index+1,version:1,student_id:row.student_key,
     university:row.school.name,
     details:{selection:row.selection,waitlist:row.waitlist,field:row.field,track_type:row.track_type,school_type:row.school_type},
-    originalUniversity:row.university
+    originalUniversity:row.university,duplicateNote:row.review,sourceRefs:row.sources.map(s=>({id:s.id,version:s.version}))
   }))};
 }
 let existingUser = null;
@@ -3357,7 +3382,7 @@ function existingRecord(row) {
     id:String(row.id), version:String(row.version), rowNumber:row.id,
     studentKey:row.student_id, universityType:d.school_type || '',
     enrollment:row.status, classNo:String(row.classroom || ''), studentNo:String(row.number || ''),
-    name:row.name, university:row.university, campus:row.originalUniversity || row.university, track:d.field || '',
+    name:row.name, university:row.university, campus:row.originalUniversity || row.university, duplicateNote:row.duplicateNote||'',track:d.field || '',
     admissionType:d.track_type || '', admissionName:row.track, recruitmentUnit:row.department,
     birthdate:existingUser?.role==='admin' ? row.birthdate || '' : '', examNo:row.exam || '',
     selectionType:d.selection || '', stage1Locked:d.selection==='일괄합산',
@@ -3403,7 +3428,7 @@ async function existingApi(action, payload={}) {
       if(key==='stage1' && current.stage1Locked)throw new ApiError('VALIDATION_ERROR','일괄합산 전형은 1차 결과를 입력하지 않습니다.');
       body[existingFields[key]]=payload.values[key];
     }
-    try {await existingRequest('application',body);}
+    try {await existingRequest('result',{items:old.sourceRefs||[{id:old.id,version:old.version}],changes:Object.fromEntries(keys.map(key=>[existingFields[key],payload.values[key]]))});}
     catch(error){
       if(error.code==='FIELD_CONFLICT'){
         const fresh=(await existingRequest('data')).rows.find(row=>row.id===old.id);
@@ -3439,6 +3464,35 @@ async function existingApi(action, payload={}) {
 }
 
 
+
+let editorPopup=null,editorNonce='',editorConnected=false;
+const editorPending=new Map();
+const editorOrigin='https://ieum-admissions-2027-kkw.bboykw.chatgpt.site';
+function editorRequest(action,body){return new Promise((resolve,reject)=>{
+ if(!editorConnected||!editorPopup||editorPopup.closed){editorConnected=false;reject(new ApiError('UNAUTHENTICATED','관리자 연결을 다시 열어 주세요.'));return;}
+ const id=crypto.randomUUID(),timer=setTimeout(()=>{editorPending.delete(id);reject(new ApiError('NETWORK_ERROR','관리자 연결 응답이 없습니다. 연결 창을 확인하세요.'));},30000);
+ editorPending.set(id,{resolve,reject,timer});editorPopup.postMessage({type:'admissions-editor-request',nonce:editorNonce,id,action,body},editorOrigin);
+});}
+window.addEventListener('message',async event=>{
+ if(event.origin!==editorOrigin||event.source!==editorPopup||event.data?.nonce!==editorNonce)return;
+ const msg=event.data;
+ if(msg.type==='admissions-editor-response'){
+  const p=editorPending.get(msg.id);if(!p)return;clearTimeout(p.timer);editorPending.delete(msg.id);
+  if(msg.ok)p.resolve(msg.data);else p.reject(new ApiError(msg.status===409?'FIELD_CONFLICT':msg.status===401?'UNAUTHENTICATED':'VALIDATION_ERROR',msg.data?.error||'저장 실패'));return;
+ }
+ if(msg.type==='admissions-editor-ready'&&!editorConnected){
+  editorConnected=true;existingUser={role:'admin'};
+  document.getElementById('editorButton').textContent='수정 모드 종료';
+  document.getElementById('editNotice').hidden=false;
+  try{await performSearch();}catch(e){showToast(e.message);}
+ }
+});
+function openEditor(){
+ if(editorConnected){editorConnected=false;existingUser={role:'viewer'};document.getElementById('editorButton').textContent='관리자 수정';document.getElementById('editNotice').hidden=true;location.reload();return;}
+ editorNonce=crypto.randomUUID();editorPopup=window.open(editorOrigin+'/api/editor-connect#'+editorNonce,'admissions-editor','width=660,height=560');
+ if(!editorPopup){showToast('관리자 연결 창의 팝업을 허용해 주세요.');return;}
+}
+document.getElementById('editorButton').addEventListener('click',openEditor);
 
     async function api(action, payload = {}, options = {}) {
       if (!DEMO_MODE) return existingApi(action, payload);
@@ -4185,10 +4239,10 @@ async function existingApi(action, payload={}) {
         const av = String(a[state.sortKey] || '');
         const bv = String(b[state.sortKey] || '');
         const numeric = ['classNo', 'studentNo', 'birthdate'].includes(state.sortKey);
-        const result = numeric
+        const result = state.sortKey==='enrollment' ? ((a.enrollment==='재학생'?0:1)-(b.enrollment==='재학생'?0:1)) : numeric
           ? av.localeCompare(bv, 'ko', { numeric: true, sensitivity: 'base' })
           : av.localeCompare(bv, 'ko', { numeric: true, sensitivity: 'base' });
-        return (state.sortDirection === 'asc' ? result : -result) || String(a.name || '').localeCompare(String(b.name || ''), 'ko');
+        return (state.sortDirection === 'asc' ? result : -result) || String(a.classNo||'').localeCompare(String(b.classNo||''),'ko',{numeric:true}) || String(a.studentNo||'').localeCompare(String(b.studentNo||''),'ko',{numeric:true}) || String(a.name||'').localeCompare(String(b.name||''),'ko') || String(a.admissionName||'').localeCompare(String(b.admissionName||''),'ko');
       });
     }
 
@@ -4969,7 +5023,7 @@ async function existingApi(action, payload={}) {
     }
 
     function applyStage1Cascade(record, values, changedKey, previousStage1) {
-      if (!isStepwiseSelection(record) || changedKey !== 'stage1') return;
+      if (!DEMO_MODE || !isStepwiseSelection(record) || changedKey !== 'stage1') return;
       if (DEMO_MODE && values.stage1 === '불합격') {
         values.finalResult = '불합격';
         values.failureReason = '1단계 불합격';
@@ -4983,6 +5037,7 @@ async function existingApi(action, payload={}) {
       }
     }
 
+    function outcomeTone(value){return ['합격','충원합격'].includes(value)?'pass':value==='불합격'?'fail':value==='예비'?'wait':'unknown';}
     function makeInlineResultField(record, key, showLabel, showFeedback) {
       const definition = RESULT_DEFINITIONS[key];
       const field = makeElement('div', '', showLabel ? 'card-result-field' : 'result-input-wrap');
@@ -5046,9 +5101,10 @@ async function existingApi(action, payload={}) {
         syncResultFieldFilledState(field, definition.type === 'checkbox' ? control.checked : Boolean(control.value));
         control.dataset.recordId = record.id;
         control.dataset.resultKey = key;
+        control.dataset.outcome = outcomeTone(values[key]);
         control.setAttribute('aria-label', `${record.name || ''} ${definition.label}`.trim());
         control.disabled = !DEMO_MODE && (existingUser?.role !== 'admin' || !existingFields[key]);
-        if (control.disabled) control.title = '교사용 조회 전용';
+        if (control.disabled){control.title='교사용 조회 전용';if(control.tagName==='INPUT')control.placeholder='-';}
         control.addEventListener('click', event => event.stopPropagation());
         if (definition.type === 'checkbox') {
           const toggle = makeElement('div', '', 'prediction-toggle');
@@ -5129,6 +5185,7 @@ async function existingApi(action, payload={}) {
         if (control.type === 'checkbox') control.checked = Boolean(values[key]);
         else if (control.value !== values[key]) control.value = values[key];
         control.classList.toggle('is-filled', Boolean(values[key]));
+        control.dataset.outcome=outcomeTone(values[key]);
         const field = control.closest('.result-input-wrap, .card-result-field');
         if (field) syncResultFieldFilledState(field, Boolean(values[key]));
         control.disabled = !DEMO_MODE && (existingUser?.role !== 'admin' || !existingFields[key]);
@@ -6441,6 +6498,7 @@ async function existingApi(action, payload={}) {
   </script>
 </body>
 </html>
+
 
 
 
