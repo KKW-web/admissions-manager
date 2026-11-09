@@ -2379,6 +2379,8 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
       </div>
       <div id="scheduleGrid" class="schedule-grid" aria-live="polite"></div>
       <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:16px">
+        <label style="display:inline-flex;align-items:center;gap:6px"><input id="schoolScheduleOnly" type="checkbox"> 우리 학교 지원 대학만</label>
+        <span id="schoolScheduleHint" role="status"></span>
         <button id="schedulePrev" type="button" class="ghost-button">이전 날</button>
         <label>일정 날짜 <input id="scheduleDatePicker" type="date" min="2026-05-14" max="2027-01-04" style="padding:8px;border:1px solid #cbd8df;border-radius:8px"></label>
         <button id="scheduleNext" type="button" class="ghost-button">다음 날</button>
@@ -2807,6 +2809,24 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
     }
 
     let selectedScheduleDate='';
+    let scheduleSchoolUniversities = new Map();
+    let scheduleSchoolLoaded = false;
+    function scheduleUniversityKey(value) {
+      return String(value || '').normalize('NFKC').replace(/\([^)]*\)/g,'').replace(/\s+/g,'').replace(/대학교/g,'대');
+    }
+    function updateScheduleSchoolUniversities(rows) {
+      scheduleSchoolUniversities = new Map(rows.map(row=>[scheduleUniversityKey(row.university),row.university]));
+      scheduleSchoolLoaded = true;
+      renderTodaySchedule();
+    }
+    async function openScheduleApplicants(universityName) {
+      const university = scheduleSchoolUniversities.get(scheduleUniversityKey(universityName));
+      if(!university)return;
+      if(elements.scheduleDialog.open)elements.scheduleDialog.close();
+      applyFilterSnapshot({university,includeCampuses:true});
+      await performSearch({silent:false,manual:true});
+      elements.resultsSection.scrollIntoView({behavior:'smooth',block:'start'});
+    }
     function currentScheduleDateKey() {
       if(selectedScheduleDate)return selectedScheduleDate;
       const requested = new URLSearchParams(location.search).get('scheduleDate');
@@ -2840,9 +2860,16 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
         .replace(/\s+/g, '')
         .replace(/대학교/g, '대');
       if (SEOUL_MAJOR_UNIVERSITIES.has(universityKey)) item.classList.add('is-seoul-major');
-      const university = document.createElement('strong');
+      const hasApplicants = scheduleSchoolUniversities.has(scheduleUniversityKey(entry.university));
+      const university = document.createElement(hasApplicants ? 'button' : 'strong');
       university.className = 'schedule-university';
       university.textContent = entry.university;
+      if(hasApplicants){
+        university.type='button';
+        university.style.cssText='border:0;background:transparent;padding:0;color:#176b74;text-decoration:underline;cursor:pointer;font:inherit;font-weight:700;text-align:left';
+        university.setAttribute('aria-label',entry.university+' 지원 학생·합불 보기');
+        university.addEventListener('click',()=>openScheduleApplicants(entry.university));
+      }
       const detail = document.createElement('span');
       detail.className = 'schedule-detail';
       detail.textContent = entry.detail;
@@ -2868,10 +2895,12 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
 
     function scheduleEntries(categoryKey) {
       const schedule = ADMISSION_SCHEDULES[currentScheduleDateKey()] || {};
-      return Array.isArray(schedule[categoryKey]) ? schedule[categoryKey] : [];
+      const entries = Array.isArray(schedule[categoryKey]) ? schedule[categoryKey] : [];
+      return $('schoolScheduleOnly').checked ? entries.filter(entry=>scheduleSchoolUniversities.has(scheduleUniversityKey(entry.university))) : entries;
     }
 
     function renderTodaySchedule() {
+      $('schoolScheduleHint').textContent = !scheduleSchoolLoaded ? '로그인 후 지원 대학 연결' : '밑줄 대학을 누르면 지원 학생·합불 조회 · 대학 전체 전형 기준';
       const dateKey = currentScheduleDateKey();
       const dateLabel = scheduleDateLabel(dateKey);
       elements.todayScheduleDate.dateTime = dateKey;
@@ -3458,6 +3487,7 @@ async function existingApi(action, payload={}) {
   if(action==='logout'){await existingRequest('logout',{});existingRows=[];return {ok:true};}
   const data=await existingRequest('data');
   existingRows=data.rows;
+  updateScheduleSchoolUniversities(existingRows);
   const records=existingRows.map(existingRecord);
   const fingerprint=JSON.stringify(existingRows);
   let hash=2166136261;
@@ -6549,6 +6579,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
       configureSortControls();
       renderTodaySchedule();
       $('scheduleDatePicker').addEventListener('change',event=>{if(!event.target.value||!event.target.validity.valid)return;selectedScheduleDate=event.target.value;renderTodaySchedule();});
+      $('schoolScheduleOnly').addEventListener('change',renderTodaySchedule);
       const moveSchedule=offset=>{const date=new Date(currentScheduleDateKey()+'T12:00:00+09:00');date.setUTCDate(date.getUTCDate()+offset);selectedScheduleDate=date.toISOString().slice(0,10);renderTodaySchedule();};
       $('schedulePrev').addEventListener('click',()=>moveSchedule(-1));
       $('scheduleNext').addEventListener('click',()=>moveSchedule(1));
