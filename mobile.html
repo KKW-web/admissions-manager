@@ -3328,6 +3328,9 @@ const hansungTracks = new Map([
 function compact(value){return String(value||'').normalize('NFKC').replace(/\s+/g,'');}
 function trackInfo(value,university){
  let t=compact(value),kind='';
+ // Strip category wrappers only; the inner named admission track remains intact.
+ t=t.replace(/^실기\/실적(?:위주)?(?=[([])/,'실기');
+ t=t.replace(/^교과(?=[([])/,'학생부교과').replace(/^종합(?=[([])/,'학생부종합');
  const match=t.match(/^(학생부위주\((교과|종합)\)-?|학생부(교과|종합)(전형)?|교과-|종합-|학종)/);
  if(match){kind=match[2]||match[3]||(match[0].includes('교과')?'교과':'종합');t=t.slice(match[0].length);}
  if(/^논술/.test(t))kind='논술';
@@ -3352,6 +3355,8 @@ function departmentKey(value,school){
  const key=compact(value);
  // Explicit official-program alias only: do not collapse arbitrary department prefixes.
  if(school==='광운대학교'&&key==='반도체시스템공학부반도체시스템공학전공')return '반도체시스템공학부';
+ if(school==='중부대학교'&&key==='경찰경호학전공')return '경찰행정학전공';
+ if(school==='중부대학교'&&key==='연극영화학전공(연출/제작/기획)')return '연극영화학전공';
  return key;
 }
 function prepareRows(rows){
