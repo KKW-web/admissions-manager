@@ -2613,7 +2613,7 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
 
       { key: 'stage1', label: '1단계 합격', result: true },
       { key: 'finalResult', label: '최종 합격', result: true },
-      { key: 'failureReason', label: '불합격 사유', result: true },
+
 
       { key: 'firstWait', label: '최초 충원번호', result: true },
 
@@ -5040,7 +5040,7 @@ async function existingApi(action, payload={}) {
         control.dataset.resultKey = key;
         control.setAttribute('aria-label', `${record.name || ''} ${definition.label}`.trim());
         control.disabled = !DEMO_MODE && (existingUser?.role !== 'admin' || !existingFields[key]);
-        if (control.disabled) control.title = '1단계 불합격으로 자동 입력됨';
+        if (control.disabled) control.title = '교사용 조회 전용';
         control.addEventListener('click', event => event.stopPropagation());
         if (definition.type === 'checkbox') {
           const toggle = makeElement('div', '', 'prediction-toggle');
@@ -5124,7 +5124,7 @@ async function existingApi(action, payload={}) {
         const field = control.closest('.result-input-wrap, .card-result-field');
         if (field) syncResultFieldFilledState(field, Boolean(values[key]));
         control.disabled = !DEMO_MODE && (existingUser?.role !== 'admin' || !existingFields[key]);
-        control.title = control.disabled ? '1단계 불합격으로 자동 입력됨' : '';
+        control.title = control.disabled ? '교사용 조회 전용' : '';
       });
     }
 
@@ -6433,5 +6433,6 @@ async function existingApi(action, payload={}) {
   </script>
 </body>
 </html>
+
 
 
