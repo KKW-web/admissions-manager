@@ -3463,23 +3463,23 @@ function applicationDepartmentKey(row){
  return key;
 }
 // Source-workbook reconciliations for verified one-to-one applications.
-// Require the original labels as well as the row IDs before applying a decision.
+// Match exact original labels within one student; the teacher feed omits row IDs.
 const confirmedApplicationPairs = [
- [16,1149,["용인대학교(용인)","실기/실적[일반학생 전형(학생부 30% + 실기/기초체력 70%)]","스포츠레저학과"],["용인대학교","수시 일반학생","스포츠레저학과"]],
- [18,1150,["백석대학교(천안)","학생부교과(일반)","기독교학부"],["백석대학교","일반학생","기독교학부"]],
- [31,1162,["신한대학교(의정부)","학생부교과(교육기회균형전형)","경영대학(자율전공)"],["신한대학교","기회균형전형","경영대학(자율전공)"]],
- [50,1177,["용인대학교(용인)","실기/실적[일반학생 전형(학생부 30% + 실기/기초체력 70%)]","미디어디자인학과"],["용인대학교","수시 일반학생","미디어디자인학과"]],
- [51,1175,["경희대학교(국제)","실기/실적[실기우수자전형(디자인·도예)]","산업디자인학과"],["경희대학교","실기우수자전형(디자인)","산업디자인학과 (국제)"]],
- [56,1182,["용인대학교(용인)","실기/실적[일반학생 전형(학생부 30% + 실기/기초체력 70%)]","미디어디자인학과"],["용인대학교","수시 일반학생","미디어디자인학과"]],
- [190,1313,["신한대학교(의정부)","학생부교과(교육기회균형전형)","사회과학대학(자율전공)"],["신한대학교","기회균형전형","사회과학대학(자율전공)"]],
- [228,1348,["용인대학교(용인)","학생부교과[일반학생 전형]","사회복지학과"],["용인대학교","수시 일반학생","사회복지학과"]],
- [359,1486,["목원대학교(대전)","학생부교과(교과전형)","광고홍보커뮤니케이션학부"],["목원대학교","일반학생(교과)","광고홍보커뮤니케이션학부"]],
- [385,1505,["목원대학교(대전)","실기/실적위주(실기전형)","입체조형학부"],["목원대학교","일반학생(실기/실적위주)","입체조형학부"]],
- [424,1532,["경희대학교(국제)","실기/실적[실기우수자전형(디자인·도예)]","산업디자인학과"],["경희대학교","실기우수자전형(디자인)","산업디자인학과 (국제)"]],
- [448,1556,["한양대학교(서울)","실기/실적(음악특기자)","국악과"],["한양대학교","음악특기자","국악과(해금)"]],
- [469,1575,["한양대학교(ERICA)","학생부종합(국방전략기술공학)","국방전략기술공학과"],["한양대학교ERICA캠퍼스","학생부종합(국방전략기술공학)","국방전략기술공학과(남자)"]],
- [766,1831,["국립목포대학교(목포)","학생부종합(종합일반전형)","건축학과"],["목포대학교","종합일반","건축학과(5년제)"]],
- [768,1830,["목원대학교(대전)","학생부교과(교과전형)","건축학부"],["목원대학교","일반학생(교과)","건축학부"]]
+ [["용인대학교(용인)","실기/실적[일반학생 전형(학생부 30% + 실기/기초체력 70%)]","스포츠레저학과"],["용인대학교","수시 일반학생","스포츠레저학과"]],
+ [["백석대학교(천안)","학생부교과(일반)","기독교학부"],["백석대학교","일반학생","기독교학부"]],
+ [["신한대학교(의정부)","학생부교과(교육기회균형전형)","경영대학(자율전공)"],["신한대학교","기회균형전형","경영대학(자율전공)"]],
+ [["용인대학교(용인)","실기/실적[일반학생 전형(학생부 30% + 실기/기초체력 70%)]","미디어디자인학과"],["용인대학교","수시 일반학생","미디어디자인학과"]],
+ [["경희대학교(국제)","실기/실적[실기우수자전형(디자인·도예)]","산업디자인학과"],["경희대학교","실기우수자전형(디자인)","산업디자인학과 (국제)"]],
+ [["용인대학교(용인)","실기/실적[일반학생 전형(학생부 30% + 실기/기초체력 70%)]","미디어디자인학과"],["용인대학교","수시 일반학생","미디어디자인학과"]],
+ [["신한대학교(의정부)","학생부교과(교육기회균형전형)","사회과학대학(자율전공)"],["신한대학교","기회균형전형","사회과학대학(자율전공)"]],
+ [["용인대학교(용인)","학생부교과[일반학생 전형]","사회복지학과"],["용인대학교","수시 일반학생","사회복지학과"]],
+ [["목원대학교(대전)","학생부교과(교과전형)","광고홍보커뮤니케이션학부"],["목원대학교","일반학생(교과)","광고홍보커뮤니케이션학부"]],
+ [["목원대학교(대전)","실기/실적위주(실기전형)","입체조형학부"],["목원대학교","일반학생(실기/실적위주)","입체조형학부"]],
+ [["경희대학교(국제)","실기/실적[실기우수자전형(디자인·도예)]","산업디자인학과"],["경희대학교","실기우수자전형(디자인)","산업디자인학과 (국제)"]],
+ [["한양대학교(서울)","실기/실적(음악특기자)","국악과"],["한양대학교","음악특기자","국악과(해금)"]],
+ [["한양대학교(ERICA)","학생부종합(국방전략기술공학)","국방전략기술공학과"],["한양대학교ERICA캠퍼스","학생부종합(국방전략기술공학)","국방전략기술공학과(남자)"]],
+ [["국립목포대학교(목포)","학생부종합(종합일반전형)","건축학과"],["목포대학교","종합일반","건축학과(5년제)"]],
+ [["목원대학교(대전)","학생부교과(교과전형)","건축학부"],["목원대학교","일반학생(교과)","건축학부"]]
 ];
 
 function prepareRows(rows){
@@ -3530,18 +3530,28 @@ function prepareRows(rows){
   resolutions.set(source,candidate.department);
  }
  rows=rows.map(source=>{const copy={...source};if(resolutions.has(source))copy.department=resolutions.get(source);originals.set(copy,source);return copy;});
- const byId=new Map(rows.map(row=>[Number(row.id),row]));
  const confirmedKeys=new Map();
  const confirmedPrimaries=new Set();
- const labelsMatch=(row,labels)=>[row.university,row.track,row.department].every((value,index)=>compact(value)===compact(labels[index]));
- for(const [primaryId,auxiliaryId,primaryLabels,auxiliaryLabels] of confirmedApplicationPairs){
-  const primary=byId.get(primaryId),auxiliary=byId.get(auxiliaryId);
-  if(!primary||!auxiliary||primary.student_key==null||primary.student_key!==auxiliary.student_key||
-     schoolInfo(primary.university).name!==schoolInfo(auxiliary.university).name||
-     !labelsMatch(primary,primaryLabels)||!labelsMatch(auxiliary,auxiliaryLabels))continue;
-  confirmedKeys.set(primary,primaryId);
-  confirmedKeys.set(auxiliary,primaryId);
-  confirmedPrimaries.add(originals.get(primary));
+ const signature=(labels)=>JSON.stringify(labels.map(compact));
+ const rowsByLabel=new Map();
+ for(const row of rows){
+  if(row.student_key==null)continue;
+  const label=signature([row.university,row.track,row.department]);
+  if(!rowsByLabel.has(label))rowsByLabel.set(label,[]);
+  rowsByLabel.get(label).push(row);
+ }
+ let confirmedIndex=0;
+ for(const [primaryLabels,auxiliaryLabels] of confirmedApplicationPairs){
+  const primaries=rowsByLabel.get(signature(primaryLabels))||[];
+  const auxiliaries=rowsByLabel.get(signature(auxiliaryLabels))||[];
+  for(const primary of primaries){
+   if(confirmedKeys.has(primary)||primaries.filter(r=>r.student_key===primary.student_key).length!==1)continue;
+   const peers=auxiliaries.filter(r=>r.student_key===primary.student_key);
+   if(peers.length!==1||confirmedKeys.has(peers[0]))continue;
+   confirmedKeys.set(primary,confirmedIndex);
+   confirmedKeys.set(peers[0],confirmedIndex++);
+   confirmedPrimaries.add(originals.get(primary));
+  }
  }
  const groups=new Map();const out=[];
  for(const source of rows){
