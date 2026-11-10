@@ -3391,7 +3391,7 @@ function prepareRows(rows){
      meaningful(primary.exam)||primary.selection!=='일괄합산')continue;
   const peers=rows.filter(r=>r.student_key===primary.student_key&&schoolInfo(r.university).name==='삼육대학교'&&trackInfo(r.track,'삼육대학교').key==='논술우수자');
   if(peers.length!==2)continue;
-  const secondary=peers.find(r=>r.university==='삼육대학교'&&r.track==='논술우수자'&&r.department==='컴퓨터공학부'&&meaningful(r.exam));
+  const secondary=peers.find(r=>r.university==='삼육대학교'&&r.track==='논술우수자'&&r.department==='컴퓨터공학부');
   if(secondary)resolutions.set(secondary,primary.department);
  }
  for(const source of rows){
