@@ -3332,7 +3332,19 @@ const trackSpelling = {
  '서강대학교':{'일반1':'일반I'},
  '한남대학교':{'한남인재I서류':'한남인재I'},
  '한서대학교':{'학생부교과':'교과'},
- '세종대학교':{'국방AI융합시스템공학특별':'국방AI융합시스템공학'}
+ '세종대학교':{'국방AI융합시스템공학특별':'국방AI융합시스템공학'},
+ '국민대학교':{'교과성적우수자학교장추천':'교과우수자학교장추천'},
+ '국립공주대학교':{'교과일반정원내':'일반','일반정원내':'일반','기회균형일반정원내':'기회균형일반'},
+ '국립한국교통대학교':{'학생부종합II':'II'},
+ '충북대학교':{'학생부종합II':'II'},
+ '대구가톨릭대학교':{'실기일반실기실적':'실기일반'},
+ '대림대학교':{'특별일반고':'일반고'},
+ '동국대학교':{'실기미술학부':'미술학부'},
+ '동양대학교':{'고른기':'고른기회'},
+ '세명대학교':{'일반_수시':'일반'},
+ '서울과학기술대학교':{'기회균형기회균등':'기회균등'},
+ '용인대학교':{'수시자율전공특별':'자율전공특별','수시교과성적우수자':'교과성적우수자특별'},
+ '호남대학교':{'일반학생A면접중심':'일반학생A'}
 };
 function trackInfo(value,university){
  let t=compact(value),kind='';
@@ -3346,6 +3358,7 @@ function trackInfo(value,university){
  if(university==='한성대학교')t=compact(hansungTracks.get(value)||t);
  if(university==='광운대학교')t=t.replace('광운참빛인재전형I-면접형','광운참빛인재전형-면접형').replace('광운참빛인재전형II-서류형','광운참빛인재전형-서류형');
  if(university==='경동대학교')t=t.replace('(수시)','');
+ if(university==='한서대학교'&&compact(value)==='학생부교과전형')t='교과';
  if(university==='상명대학교'&&t==='[천안]학생부종합(상명인재전형)'){t='상명인재전형';kind='종합';}
  if(university==='충남대학교'){
   const aliases={
@@ -3446,6 +3459,24 @@ function prepareRows(rows){
  // Fill only a missing department when an explicitly named track has one
  // reciprocal counterpart. Never infer an application from student/school alone.
  const originals=new Map();const resolutions=new Map();
+ // The search workbook omits the domestic/overseas qualifier from this
+ // Yonsei track. Resolve it only against a unique domestic-high-school pair.
+ const yonseiTracks=new Map();
+ const yonseiByStudent=new Map();
+ for(const row of rows){
+  if(row.student_key==null||row.status!=='재학생'||schoolInfo(row.university).name!=='연세대학교')continue;
+  if(!['융합과학공학부','융합인문사회과학부'].includes(compact(row.department)))continue;
+  if(!trackInfo(row.track,'연세대학교').key.startsWith('국제형'))continue;
+  const key=JSON.stringify([row.student_key,compact(row.department)]);
+  if(!yonseiByStudent.has(key))yonseiByStudent.set(key,[]);
+  yonseiByStudent.get(key).push(row);
+ }
+ for(const pair of yonseiByStudent.values()){
+  if(pair.length!==2)continue;
+  const primary=pair.find(r=>campusOf(r.university)==='서울'&&compact(r.track)==='학생부종합(국제형-국내고)');
+  const secondary=pair.find(r=>compact(r.university)==='연세대학교'&&compact(r.track)==='학생부종합전형[국제형]');
+  if(primary&&secondary)yonseiTracks.set(secondary,primary.track);
+ }
  // This pair was reconciled in favor of the admissions-management workbook.
  // Keep the two original rows and require the expected identity and labels.
  for(const primary of rows){
@@ -3475,7 +3506,8 @@ function prepareRows(rows){
  const groups=new Map();const out=[];
  for(const source of rows){
   const row={...source,school:schoolInfo(source.university),sources:[originals.get(source)],review:''};
-  const t=trackInfo(source.track,row.school.name);row.trackKind=t.kind;
+  const original=originals.get(source);
+  const t=trackInfo(yonseiTracks.get(original)||source.track,row.school.name);row.trackKind=t.kind;
   if(source.student_key==null||!meaningful(source.track)||!meaningful(source.department)){
    const peers=rows.filter(other=>other!==source&&other.student_key===source.student_key&&schoolInfo(other.university).name===row.school.name);
    row.review=!peers.length?'원본 대조 완료 · 보완 자료 없음':!meaningful(source.track)?'원본 전형 미기재 · 통합 보류':'원본 대조 완료 · 전형/학과 확인 필요';out.push(row);continue;
