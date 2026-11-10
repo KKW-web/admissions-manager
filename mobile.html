@@ -2241,6 +2241,24 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
  #editNotice{background:#e1f0f1;color:#17324d;padding:12px;border-radius:10px}
  #editorButton{border:0;cursor:pointer;font:inherit;white-space:nowrap}
  #editorButton[hidden]{display:none!important}
+    .search-intro { margin-bottom: 16px; }
+    .search-intro h1 { margin: 0; color: #17324d; font-size: clamp(18px, 2vw, 23px); line-height: 1.35; }
+    .search-intro p { margin: 5px 0 0; color: #476070; font-size: 13px; line-height: 1.5; }
+    body.has-searched .search-intro { display: none; }
+    .topbar .home-button { flex: none; min-height: 40px; padding-inline: 12px; }
+    .home-button .button-icon { width: 16px; height: 16px; }
+    .topbar .home-button:hover { background: #d5e9ed; }
+    .home-button:focus-visible, .change-search:focus-visible { outline: 3px solid #279ba4; outline-offset: 3px; }
+    #searchHeading:focus-visible { outline: 2px solid #279ba4; outline-offset: 4px; border-radius: 3px; }
+    .empty-state .change-search { margin-top: 12px; min-height: 42px; padding-inline: 14px; }
+    @media (max-width: 600px) {
+      .topbar .home-button { min-height: 44px; padding-inline: 8px; font-size: 12px; }
+      .home-button .button-icon { display: none; }
+      .search-intro { margin-bottom: 12px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
 </style>
 </head>
 <body class="mobile-edition">
@@ -2252,7 +2270,12 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
         
         <span class="brand-title">2027 수시진학관리</span>
       </div>
-      <div class="topbar-actions"><button class="edition-switch" id="editorButton" type="button" hidden>관리자 로그인</button>
+      <div class="topbar-actions">
+        <button class="edition-switch home-button" id="homeButton" type="button" title="검색 조건을 지우고 첫 화면으로 이동">
+          <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 11 9-8 9 8M5 10v10h5v-6h4v6h5V10"/></svg>
+          <span>처음으로</span>
+        </button>
+        <button class="edition-switch" id="editorButton" type="button" hidden>관리자 로그인</button>
         <a class="edition-switch pc-edition-link" href="https://kkw-web.github.io/admissions-manager/mobile.html" aria-label="모바일 버전으로 이동">
           <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M10 17h4"/></svg>
           <span>모바일 버전</span>
@@ -2283,6 +2306,10 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
         <svg class="summary-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
       </button>
       <form id="searchForm" novalidate>
+        <div class="search-intro">
+          <h1 id="searchHeading" tabindex="-1">지원 결과 조회</h1>
+          <p>학생 이름이나 대학명으로 찾을 수 있습니다. 전체 지원을 보려면 조건을 비운 채 검색하세요.</p>
+        </div>
         <div class="primary-search">
           <div class="field select-wrap primary-enrollment-field">
             <label for="enrollmentSelect">재학여부</label>
@@ -2332,12 +2359,12 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
           <div class="utility-button-group" role="group" aria-label="검색 보조 기능">
             <button id="detailToggle" class="detail-toggle" type="button" aria-expanded="false" aria-controls="detailFilters">
               <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h7M15 6h5M4 12h3M11 12h9M4 18h10M18 18h2"/><circle cx="13" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></svg>
-              <span>추가 옵션</span>
+              <span>상세 검색</span>
             </button>
             <input id="reviewOnly" type="checkbox" hidden>
             <button id="clearButton" class="ghost-button clear-button" type="button">
               <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v6h6"/><path d="M5.5 15a7 7 0 1 0 1-7"/></svg>
-              <span>초기화</span>
+              <span>조건 지우기</span>
             </button>
           </div>
         </div>
@@ -2405,6 +2432,7 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
         <div>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
           <span>검색 결과 없음</span>
+          <button id="editSearchButton" class="small-button change-search" type="button">검색 조건 수정</button>
         </div>
       </div>
 
@@ -2443,7 +2471,7 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
   <div class="mobile-actionbar">
     <button id="mobileDetailButton" class="detail-toggle" type="button" aria-expanded="false" aria-controls="detailFilters">
       <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h7M15 6h5M4 12h3M11 12h9M4 18h10M18 18h2"/><circle cx="13" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></svg>
-      <span>추가 옵션</span>
+      <span>상세 검색</span>
     </button>
     <button id="mobileSearchButton" class="search-button" type="button">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
@@ -5915,8 +5943,8 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
     function resetSearch() {
       if (hasPendingResultWork()) {
         persistPendingDrafts();
-        toast('입력값 반영이 끝난 뒤 초기화해 주세요.', 'error', 4200);
-        return;
+        toast('입력값 반영이 끝난 뒤 다시 시도해 주세요.', 'error', 4200);
+        return false;
       }
       state.pendingManualSearch = false;
       if (state.searchController) state.searchController.abort();
@@ -6591,7 +6619,19 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
       });
       elements.detailToggle.addEventListener('click', () => toggleDetails());
       elements.mobileDetailButton.addEventListener('click', () => toggleDetails());
-      elements.clearButton.addEventListener('click', resetSearch);
+      const returnHome = () => {
+        if (resetSearch() === false) return;
+        toggleDetails(false);
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        $('searchHeading').focus({ preventScroll: true });
+      };
+      $('homeButton').addEventListener('click', returnHome);
+      elements.clearButton.addEventListener('click', returnHome);
+      $('editSearchButton').addEventListener('click', () => {
+        if (EDITION === 'mobile') setMobileSearchExpanded(true);
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        elements.nameInput.focus({ preventScroll: true });
+      });
       $('reviewOnly').addEventListener('change',()=>performSearch({silent:false,manual:true}));
       elements.scheduleGrid.addEventListener('click', event => {
         const button = event.target.closest('[data-schedule-category]');
