@@ -2652,7 +2652,7 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
     const RESULT_KEYS = Object.freeze(Object.keys(RESULT_DEFINITIONS));
     const FILTER_KEYS = Object.freeze([
       'university', 'name', 'admissionName', 'recruitmentUnit', 'universityType',
-      'enrollment', 'classNo', 'admissionType', 'includeCampuses', 'reviewOnly',
+      'enrollment', 'classNo', 'admissionType', 'includeCampuses', 'reviewOnly', 'universityExact',
     ]);
 
     const state = {
@@ -2823,7 +2823,7 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
       const university = scheduleSchoolUniversities.get(scheduleUniversityKey(universityName));
       if(!university)return;
       if(elements.scheduleDialog.open)elements.scheduleDialog.close();
-      applyFilterSnapshot({university,includeCampuses:true});
+      applyFilterSnapshot({university,includeCampuses:true,universityExact:true});
       await performSearch({silent:false,manual:true});
       elements.resultsSection.scrollIntoView({behavior:'smooth',block:'start'});
     }
@@ -3583,7 +3583,9 @@ function existingFilter(rows, filters={}) {
   const text=value=>String(value || '').normalize('NFKC').replace(/\s/g,'').toLocaleLowerCase('ko');
   return rows.filter(row=>Object.entries(filters).every(([key,value])=>{
     if(key==='reviewOnly')return !value||row.reviewRequired===true;
+    if(key==='universityExact')return true;
     if(key==='includeCampuses' || !value)return true;
+    if(key==='university'&&filters.universityExact)return text(row.university)===text(value);
     if(['classNo','enrollment','universityType','admissionType'].includes(key))return String(row[key] || '')===String(value);
     return text(row[key]).includes(text(value));
   }));
@@ -3763,6 +3765,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
       const admissionName = elements.admissionInput.value.trim();
       return {
         university,
+        universityExact: Boolean(university && elements.universityInput.dataset.selectedUniversity === university),
         name,
         admissionName,
         recruitmentUnit: elements.recruitmentUnitInput.value.trim(),
@@ -3776,11 +3779,11 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
     }
 
     function hasFilter(filters) {
-      return FILTER_KEYS.some(key => key !== 'includeCampuses' && String(filters && filters[key] || '').trim());
+      return FILTER_KEYS.some(key => !['includeCampuses','universityExact'].includes(key) && String(filters && filters[key] || '').trim());
     }
 
     function searchCacheKey(filters) {
-      return JSON.stringify(FILTER_KEYS.map(key => ['includeCampuses','reviewOnly'].includes(key)
+      return JSON.stringify(FILTER_KEYS.map(key => ['includeCampuses','reviewOnly','universityExact'].includes(key)
         ? Boolean(filters && filters[key])
         : String(filters && filters[key] || '').trim()));
     }
@@ -4147,6 +4150,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
       const input = elements.universityInput;
       const typedValue = input.value.trim();
       if (!typedValue) return;
+      if (input.dataset.selectedUniversity === typedValue) return;
       if (signal && signal.aborted) throw abortError();
       const candidates = state.universities;
       let canonical = canonicalUniversityName(typedValue, candidates);
@@ -4996,7 +5000,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
       };
       const normalized = {};
       FILTER_KEYS.forEach(key => {
-        normalized[key] = ['includeCampuses','reviewOnly'].includes(key)
+        normalized[key] = ['includeCampuses','reviewOnly','universityExact'].includes(key)
           ? Boolean(migrated[key])
           : String(migrated[key] || '');
       });
@@ -5098,6 +5102,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
     function applyFilterSnapshot(filters) {
       const values = normalizeFilterSnapshot(filters);
       elements.universityInput.value = values.university;
+      elements.universityInput.dataset.selectedUniversity = values.universityExact ? values.university : '';
       elements.nameInput.value = values.name;
       elements.admissionInput.value = values.admissionName;
       elements.recruitmentUnitInput.value = values.recruitmentUnit;
@@ -5830,6 +5835,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
       if (state.searchController) state.searchController.abort();
       setSearchBusy(false);
       elements.searchForm.reset();
+      delete elements.universityInput.dataset.selectedUniversity;
       state.records = [];
       state.drafts.clear();
       state.inFlightDrafts.clear();
@@ -6214,7 +6220,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
             button.setAttribute('role', 'option');
             button.setAttribute('aria-selected', 'false');
             button.addEventListener('mousedown', event => event.preventDefault());
-            button.addEventListener('click', () => { input.value = name; close(); input.focus(); });
+            button.addEventListener('click', () => { commitSuggestion(name); input.focus(); });
             button.addEventListener('pointerenter', () => selectIndex(index, { scroll: false }));
             panel.append(button);
           });
@@ -6241,7 +6247,14 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
         }
       }
 
+      function commitSuggestion(value) {
+        input.value = value;
+        if (input === elements.universityInput) input.dataset.selectedUniversity = value;
+        close();
+      }
+
       input.addEventListener('input', () => {
+        if (input === elements.universityInput) delete input.dataset.selectedUniversity;
         pendingNavigation = 0;
         const defaultDelay = state.universitySearchIndex.length
           ? (EDITION === 'mobile' ? 30 : 25)
@@ -6280,7 +6293,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
           }
           selectIndex(activeIndex <= 0 ? suggestions.length - 1 : activeIndex - 1);
         }
-        else if (event.key === 'Enter' && activeIndex >= 0) { event.preventDefault(); input.value = suggestions[activeIndex]; close(); }
+        else if (event.key === 'Enter' && activeIndex >= 0) { event.preventDefault(); commitSuggestion(suggestions[activeIndex]); }
         else if (event.key === 'Escape') { event.preventDefault(); close(); }
       });
       input.addEventListener('blur', () => setTimeout(() => {
