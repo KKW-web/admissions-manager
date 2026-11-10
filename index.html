@@ -3383,6 +3383,17 @@ function prepareRows(rows){
  // Fill only a missing department when an explicitly named track has one
  // reciprocal counterpart. Never infer an application from student/school alone.
  const originals=new Map();const resolutions=new Map();
+ // This pair was reconciled in favor of the admissions-management workbook.
+ // Keep the two original rows and require the expected identity and labels.
+ for(const primary of rows){
+  if(primary.student_key==null||primary.university!=='삼육대학교(서울)'||
+     primary.track!=='논술(논술우수자)'||primary.department!=='창의융합자유전공학부'||
+     meaningful(primary.exam)||primary.selection!=='일괄합산')continue;
+  const peers=rows.filter(r=>r.student_key===primary.student_key&&schoolInfo(r.university).name==='삼육대학교'&&trackInfo(r.track,'삼육대학교').key==='논술우수자');
+  if(peers.length!==2)continue;
+  const secondary=peers.find(r=>r.university==='삼육대학교'&&r.track==='논술우수자'&&r.department==='컴퓨터공학부'&&meaningful(r.exam));
+  if(secondary)resolutions.set(secondary,primary.department);
+ }
  for(const source of rows){
   if(source.student_key==null||!meaningful(source.track)||meaningful(source.department))continue;
   const school=schoolInfo(source.university).name,t=trackInfo(source.track,school);
@@ -3415,7 +3426,9 @@ function prepareRows(rows){
   const campuses=new Set(items.map(r=>campusOf(r.university)).filter(Boolean));
   const conflict=['first_stage','final_stage','waitlist','selection','exam','registration','round'].some(key=>new Set(items.map(r=>r[key]).filter(meaningful).map(compact)).size>1);
   if(knownKinds.size>1||campuses.size>1||conflict){for(const row of items){row.review=conflict?'결과·정보 충돌':campuses.size>1?'캠퍼스 구분':'전형 유형 확인';out.push(row);}continue;}
-  const merged={...items[0],sources:items.flatMap(r=>r.sources),review:''};
+  // The management workbook carries the selection method and schedule.
+  const preferred=items.find(r=>meaningful(r.selection)||meaningful(r.announcement))||items[0];
+  const merged={...preferred,sources:items.flatMap(r=>r.sources),review:''};
   for(const row of items)for(const [key,value] of Object.entries(row))if(!meaningful(merged[key])&&meaningful(value))merged[key]=value;
   merged.review='원본 '+items.length+'건 통합';out.push(merged);
  }
