@@ -3411,6 +3411,7 @@ const departmentSpelling = {
   '스포츠무용학부스포츠건강관리전공':'스포츠건강관리전공'
  },
  '국민대학교':{
+  '인문기술융합학부자유전공(B)':'자유전공(B)',
   '경영학부경영학전공':'경영학전공',
   '미디어·광고학부미디어전공':'미디어전공',
   '전자공학부지능형반도체융합전자전공':'지능형반도체융합전자전공',
@@ -3422,6 +3423,7 @@ const departmentSpelling = {
   '전자공학부(전자공학전공)':'전자공학전공',
   '반도체공학부(반도체시스템전공)':'반도체시스템전공'
  },
+ '국립한국교통대학교':{'건축학과(5년제)':'건축학과'},
  '신한대학교':{'태권도학부(겨루기전공)':'겨루기전공','태권도학부(시범문화전공)':'시범문화전공'},
  '동국대학교':{'사회언론정보학부미디어커뮤니케이션학전공':'미디어커뮤니케이션학전공','경영대학(광역화)':'경영대학'},
  '서울과학기술대학교':{'ST자유전공학부_자연':'ST자유전공학부-자연'},
@@ -3449,6 +3451,11 @@ function departmentKey(value,school){
 function applicationDepartmentKey(row){
  const school=row.school.name;
  const key=departmentKey(row.department,school);
+ // Dongguk runs separate humanities and science essay selections.
+ if(school==='동국대학교'&&trackInfo(row.track,school).kind==='논술'&&key==='경찰행정학부'){
+  if(compact(row.field)==='인문')return '경찰행정학부(인문)';
+  if(compact(row.field)==='자연')return '경찰행정학부(자연)';
+ }
  if(school==='을지대학교'){
   if(key==='간호학과의정부'&&(!campusOf(row.university)||campusOf(row.university)==='의정부'))return '간호학과(의정부)';
   if(key==='간호학과'&&(/의정부/.test(row.university)))return '간호학과(의정부)';
