@@ -3338,6 +3338,17 @@ function trackInfo(value,university){
  if(university==='한성대학교')t=compact(hansungTracks.get(value)||t);
  if(university==='광운대학교')t=t.replace('광운참빛인재전형I-면접형','광운참빛인재전형-면접형').replace('광운참빛인재전형II-서류형','광운참빛인재전형-서류형');
  if(university==='경동대학교')t=t.replace('(수시)','');
+ if(university==='충남대학교'){
+  const aliases={
+   '국가안보융합인재(학생부종합)':'국가안보융합인재',
+   'Ⅱ(국가안보융합인재전형)':'국가안보융합인재',
+   'II(국가안보융합인재전형)':'국가안보융합인재',
+   'I[서류]':'서류',
+   'I[면접(300)]':'면접',
+   '일반전형(수시)':'일반전형'
+  };
+  t=aliases[t]||t;
+ }
  if(university==='가천대학교'&&t==='조기취업')t='조기취업형계약학과';
  if(university==='중앙대학교')t=t.replace(/^논술전형-/, '논술(').replace(/^실기실적-실기형$/, '실기형').replace(/^실기\/실적\(실기형전형\)$/, '실기형');
  if(university==='한국외국어대학교'){
@@ -3360,6 +3371,7 @@ const gachonDepartments = new Map([
 ]);
 function departmentKey(value,school){
  const key=compact(value).replace(/[・ᆞ]/g,'·');
+ if(school==='충남대학교'&&key==='해양안보학-해양안보학전공(남자)')return '해양안보학전공(남)';
  if(school==='가천대학교')return gachonDepartments.get(key)||key;
  // Explicit official-program alias only: do not collapse arbitrary department prefixes.
  if(school==='광운대학교'&&key==='반도체시스템공학부반도체시스템공학전공')return '반도체시스템공학부';
