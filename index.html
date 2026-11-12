@@ -3345,6 +3345,15 @@ function schoolInfo(value) {
   return { name, label };
 }
 
+function schoolDisplayName(value) {
+  const school = schoolInfo(value);
+  if (school.name !== '동국대학교') return school.name;
+  const original = String(value || '').normalize('NFKC').replace(/\s+/g, '');
+  if (/wise|와이즈|경주/i.test(original)) return '동국대학교(WISE)';
+  if (/^동국대학교(?:\((?:서울|고양)\))?$/.test(original)) return '동국대학교(서울)';
+  return school.label;
+}
+
 const hansungTracks = new Map([
   ['학생부종합(한성인재전형)', '한성인재'], ['한성인재ㅐ', '한성인재'],
   ['학생부종합(고른기회전형)', '고른기회'],
@@ -3628,7 +3637,7 @@ async function pagesRequest(path, body) {
     if(path==='data'){
       const data=await editorRequest('data');
       const flat=data.rows.map(r=>({...r,student_key:r.student_id,...r.details}));
-      return {rows:prepareRows(flat).map(r=>({...r,university:r.school.name,originalUniversity:r.university,details:{...r.details,waitlist:r.waitlist,selection:r.selection},sourceRefs:r.sources.map(s=>({id:s.id,version:s.version})),duplicateNote:r.review,reviewDone:r.sources.every(s=>s.review_done===true)}))};
+      return {rows:prepareRows(flat).map(r=>({...r,university:schoolDisplayName(r.university),originalUniversity:r.university,details:{...r.details,waitlist:r.waitlist,selection:r.selection},sourceRefs:r.sources.map(s=>({id:s.id,version:s.version})),duplicateNote:r.review,reviewDone:r.sources.every(s=>s.review_done===true)}))};
     }
   }
   if (path === 'me') {
@@ -3650,7 +3659,7 @@ async function pagesRequest(path, body) {
   if(path==='pin-login'){pagesToken=data.session;return data;}
   return {rows:prepareRows(data.rows).map((row,index)=>({
     ...row,id:index+1,version:1,student_id:row.student_key,
-    university:row.school.name,
+    university:schoolDisplayName(row.university),
     details:{selection:row.selection,waitlist:row.waitlist,field:row.field,track_type:row.track_type,school_type:row.school_type},
     originalUniversity:row.university,duplicateNote:row.review,reviewDone:row.sources.every(s=>s.review_done===true),sourceRefs:row.sources.map(s=>({id:s.id,version:s.version}))
   }))};
@@ -3927,6 +3936,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
 
     const PRIMARY_CAMPUS_ALIASES = Object.freeze({
       홍익: '서',
+      동국: '서',
     });
 
     function makeTextSuggestionIndex(values) {
