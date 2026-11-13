@@ -2649,6 +2649,7 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
       { key: 'classNo', label: '반' },
       { key: 'studentNo', label: '번호' },
       { key: 'name', label: '성명' },
+      { key: 'grade', label: '내신' },
       { key: 'university', label: '대학명' },
       { key: 'campus', label: '원본 대학·캠퍼스' },
       { key: 'reviewReason', label: '부족한 정보 · 확인할 내용' },
@@ -3695,7 +3696,7 @@ function existingRecord(row) {
     id:String(row.id), version:String(row.version), rowNumber:row.id,
     studentKey:row.student_id, universityType:d.school_type || '',
     enrollment:row.status, classNo:String(row.classroom || ''), studentNo:String(row.number || ''),
-    name:row.name, university:row.university, campus:row.originalUniversity || row.university, duplicateNote:row.duplicateNote||'',track:d.field || '',
+    name:row.name, grade:row.grade ?? '', university:row.university, campus:row.originalUniversity || row.university, duplicateNote:row.duplicateNote||'',track:d.field || '',
     admissionType:d.track_type || '', admissionName:row.track, recruitmentUnit:row.department,
     birthdate:existingUser?.role==='admin' ? row.birthdate || '' : '', examNo:row.exam || '',
     selectionType:d.selection || '', stage1Locked:d.selection==='일괄합산',
@@ -3773,8 +3774,8 @@ async function existingApi(action, payload={}) {
   }
   if(action==='export'){
     const selected=existingFilter(records,payload.filters);
-    const fields=['name','university','admissionName','recruitmentUnit','stage1','finalResult','firstWait'];
-    return {...base,headers:['학생','대학','전형','모집단위','1차','최종','예비순위'],rows:selected.map(row=>fields.map(key=>row[key])),totalMatches:selected.length};
+    const fields=['name','grade','university','admissionName','recruitmentUnit','stage1','finalResult','firstWait'];
+    return {...base,headers:['학생','내신','대학','전형','모집단위','1차','최종','예비순위'],rows:selected.map(row=>fields.map(key=>row[key])),totalMatches:selected.length};
   }
   if(action==='revision'||action==='health')return base;
   throw new ApiError('VALIDATION_ERROR','지원하지 않는 작업입니다.');
@@ -4670,6 +4671,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
           metaRow('재학여부', record.enrollment, false, enrollmentStatusClass(record.enrollment)),
           metaRow('반', record.classNo),
           metaRow('번호', record.studentNo),
+          metaRow('내신', displayValue(record, 'grade')),
           metaRow('계열', record.track)
         );
         primary.append(identity, quickMeta);
@@ -5086,6 +5088,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
     }
 
     function displayValue(record, key) {
+      if (key === 'grade') { const value = String(record.grade ?? '').trim(); const n = Number(value); return value && Number.isFinite(n) && n >= 1 && n <= 9 ? n.toFixed(2) : '-'; }
       if (key === 'birthdate') return normalizeBirthdate(record[key]);
       if (key === 'admissionName') return cleanAdmissionName(record[key]);
       return record[key] || '-';
