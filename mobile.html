@@ -4540,7 +4540,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
       if(!summary){summary=document.createElement('p');summary.id='integrationSummary';summary.setAttribute('aria-live','polite');elements.resultsCount.parentElement.append(summary);}
       const count=rows=>new Set(rows.map(row=>row.studentKey ?? row.id)).size;
       const pass=value=>['합격','충원합격'].includes(value);
-      summary.textContent='지원 '+count(sorted)+'명 · 1차 합격 '+count(sorted.filter(row=>!row.stage1Locked && pass(row.stage1)))+'명 · 최종 합격 '+count(sorted.filter(row=>pass(row.finalResult)))+'명';
+      summary.textContent='지원 '+sorted.length+'건 · 학생 '+count(sorted)+'명 · 1차 합격 '+count(sorted.filter(row=>!row.stage1Locked && pass(row.stage1)))+'명 · 최종 합격 '+count(sorted.filter(row=>pass(row.finalResult)))+'명';
       const hasRecords = sorted.length > 0;
       elements.resultsSection.hidden = !state.lastFilters && !hasRecords;
       elements.emptyState.hidden = hasRecords;
