@@ -2259,6 +2259,7 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
     }
+.sort-priority{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:12px;background:#edf6f6;border:1px solid #c3e4e6;border-radius:12px;margin:10px 0}.sort-priority small{width:100%;color:#607281}.sort-priority select{max-width:180px;padding:7px;border:1px solid #c3e4e6;border-radius:8px}th[data-column="grade"],td[data-column="grade"]{min-width:80px;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body class="mobile-edition">
@@ -2336,17 +2337,17 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
           </div>
           <div class="field autocomplete-field">
             <label for="universityInput">대학명</label>
-            <input id="universityInput" name="university" type="search" autocomplete="off" placeholder="대학명" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="universitySuggestions">
+            <input id="universityInput" name="university" type="search" autocomplete="off" placeholder="대학명 (쉼표로 여러 대학)" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="universitySuggestions">
             <div id="universitySuggestions" class="suggestions" role="listbox" hidden></div>
           </div>
           <div class="field autocomplete-field">
             <label for="admissionInput">전형명</label>
-            <input id="admissionInput" name="admissionName" type="search" autocomplete="off" placeholder="전형명" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="admissionSuggestions">
+            <input id="admissionInput" name="admissionName" type="search" autocomplete="off" placeholder="전형명 (예: 바람개비, 지역균형)" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="admissionSuggestions">
             <div id="admissionSuggestions" class="suggestions" role="listbox" hidden></div>
           </div>
           <div class="field autocomplete-field">
             <label for="recruitmentUnitInput">모집단위</label>
-            <input id="recruitmentUnitInput" name="recruitmentUnit" type="search" autocomplete="off" placeholder="모집단위" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="recruitmentUnitSuggestions">
+            <input id="recruitmentUnitInput" name="recruitmentUnit" type="search" autocomplete="off" placeholder="모집단위 (쉼표로 여러 항목)" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="recruitmentUnitSuggestions">
             <div id="recruitmentUnitSuggestions" class="suggestions" role="listbox" hidden></div>
           </div>
           <button class="search-button" id="desktopSearchButton" type="submit">
@@ -2687,6 +2688,7 @@ body.pc-edition:not(.has-searched) main{padding-top:calc(var(--topbar-height) + 
     const state = {
       records: [],
       visibleCount: INITIAL_PAGE_SIZE,
+      sortRules: [],
       sortKey: DEFAULT_SORT_KEY,
       sortDirection: DEFAULT_SORT_DIRECTION,
       lastFilters: null,
@@ -3696,7 +3698,7 @@ function existingRecord(row) {
     id:String(row.id), version:String(row.version), rowNumber:row.id,
     studentKey:row.student_id, universityType:d.school_type || '',
     enrollment:row.status, classNo:String(row.classroom || ''), studentNo:String(row.number || ''),
-    name:row.name, grade:row.grade ?? '', university:row.university, campus:row.originalUniversity || row.university, duplicateNote:row.duplicateNote||'',track:d.field || '',
+    name:row.name, grade:row.master_grade || row.grade || '', university:row.university, campus:row.originalUniversity || row.university, duplicateNote:row.duplicateNote||'',track:d.field || '',
     admissionType:d.track_type || '', admissionName:row.track, recruitmentUnit:row.department,
     birthdate:existingUser?.role==='admin' ? row.birthdate || '' : '', examNo:row.exam || '',
     selectionType:d.selection || '', stage1Locked:d.selection==='일괄합산',
@@ -3705,14 +3707,16 @@ function existingRecord(row) {
   };
 }
 function existingFilter(rows, filters={}) {
-  const text=value=>String(value || '').normalize('NFKC').replace(/\s/g,'').toLocaleLowerCase('ko');
+  const text=value=>String(value ?? '').normalize('NFKC').replace(/\s/g,'').toLocaleLowerCase('ko');
   return rows.filter(row=>Object.entries(filters).every(([key,value])=>{
     if(key==='reviewOnly')return !value||row.reviewRequired===true;
-    if(key==='universityExact')return true;
-    if(key==='includeCampuses' || !value)return true;
-    if(key==='university'&&filters.universityExact)return text(row.university)===text(value);
-    if(['classNo','enrollment','universityType','admissionType'].includes(key))return String(row[key] || '')===String(value);
-    return text(row[key]).includes(text(value));
+    if(key==='universityExact'||key==='includeCampuses'||!value)return true;
+    const terms=String(value).split(/[,，]/).map(v=>v.trim()).filter(Boolean);
+    return !terms.length||terms.some(term=>{
+      if(key==='university'&&filters.universityExact)return text(row.university)===text(term);
+      if(['classNo','enrollment','universityType','admissionType'].includes(key))return String(row[key]??'')===term;
+      return text(row[key]).includes(text(term));
+    });
   }));
 }
 async function existingApi(action, payload={}) {
@@ -4527,6 +4531,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
       totalMatches = state.lastTotalMatches || state.records.length,
       truncated = state.lastTruncated
     ) {
+      renderSortPriority();
       const sorted = sortedRecords();
       const visible = sorted.slice(0, state.visibleCount);
       const shownCount = Math.min(state.visibleCount, sorted.length);
@@ -4564,14 +4569,20 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
     }
 
     function sortedRecords() {
-      return [...state.records].sort((a, b) => {
-        const av = String(a[state.sortKey] || '');
-        const bv = String(b[state.sortKey] || '');
-        const numeric = ['classNo', 'studentNo', 'birthdate'].includes(state.sortKey);
-        const result = state.sortKey==='enrollment' ? ((a.enrollment==='재학생'?0:1)-(b.enrollment==='재학생'?0:1)) : numeric
-          ? av.localeCompare(bv, 'ko', { numeric: true, sensitivity: 'base' })
-          : av.localeCompare(bv, 'ko', { numeric: true, sensitivity: 'base' });
-        return (state.sortDirection === 'asc' ? result : -result) || String(a.classNo||'').localeCompare(String(b.classNo||''),'ko',{numeric:true}) || String(a.studentNo||'').localeCompare(String(b.studentNo||''),'ko',{numeric:true}) || String(a.name||'').localeCompare(String(b.name||''),'ko') || String(a.admissionName||'').localeCompare(String(b.admissionName||''),'ko');
+      const rules=state.sortRules.length?state.sortRules:[{key:DEFAULT_SORT_KEY,direction:DEFAULT_SORT_DIRECTION}];
+      return [...state.records].sort((a,b)=>{
+        for(const {key,direction} of rules){
+          const av=String(a[key]??'').trim(),bv=String(b[key]??'').trim();
+          if(!av!==!bv)return av?-1:1;
+          let result=key==='enrollment'?((av==='재학생'?0:1)-(bv==='재학생'?0:1)):
+            av.localeCompare(bv,'ko',{numeric:true,sensitivity:'base'});
+          if(result)return direction==='asc'?result:-result;
+        }
+        for(const key of ['classNo','studentNo','name','admissionName','id']){
+          const result=String(a[key]??'').localeCompare(String(b[key]??''),'ko',{numeric:true});
+          if(result)return result;
+        }
+        return 0;
       });
     }
 
@@ -4584,8 +4595,10 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
       COLUMNS.filter(column=>(column.key!=='reviewReason'||state.lastFilters?.reviewOnly)&&(column.key!=='reviewEdit'||existingUser?.role==='admin')).forEach(column => {
         const th = makeElement('th');
         th.dataset.column=column.key;
-        const active = state.sortKey === column.key;
-        th.setAttribute('aria-sort', active ? (state.sortDirection === 'asc' ? 'ascending' : 'descending') : 'none');
+        const priority=state.sortRules.findIndex(rule=>rule.key===column.key);
+        const rule=state.sortRules[priority];
+        const active=priority>=0;
+        th.setAttribute('aria-sort', active ? (rule.direction === 'asc' ? 'ascending' : 'descending') : 'none');
         const button = makeElement('button', '', 'sort-button');
         button.type = 'button';
         button.dataset.sortKey = column.key;
@@ -4596,7 +4609,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
             : '<path d="m8 9 4-4 4 4M16 15l-4 4-4-4"/>',
           'button-icon sort-mark-icon'
         );
-        button.append(makeElement('span', column.label), sortIcon);
+        button.append(makeElement('span', column.label+(active?' '+(priority+1)+(rule.direction==='asc'?' ↑':' ↓'):'')), sortIcon);
         button.addEventListener('click', () => changeSort(column.key));
         th.append(button);
         headFragment.append(th);
@@ -5075,10 +5088,38 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
     }
 
     function changeSort(key) {
-      if (state.sortKey === key) state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
-      else { state.sortKey = key; state.sortDirection = 'asc'; }
+      const rule=state.sortRules.find(rule=>rule.key===key);
+      if(rule)rule.direction=rule.direction==='asc'?'desc':'asc';
+      else state.sortRules.push({key,direction:'asc'});
+      state.sortKey=key;
+      state.sortDirection=state.sortRules.find(rule=>rule.key===key).direction;
       syncSortControls();
       renderResults();
+    }
+    function renderSortPriority() {
+      let panel=document.getElementById('sortPriority');
+      if(!panel){
+        panel=makeElement('div','','sort-priority');panel.id='sortPriority';
+        panel.setAttribute('aria-label','다중 정렬 설정');
+        elements.tableWrap.before(panel);
+      }
+      panel.replaceChildren();
+      panel.append(makeElement('span','정렬 우선순위: '+(state.sortRules.length?'':'기본 학번순')));
+      state.sortRules.forEach((rule,index)=>{
+        const label=COLUMNS.find(c=>c.key===rule.key)?.label||rule.key;
+        const button=makeElement('button',String(index+1)+'. '+label+(rule.direction==='asc'?' ↑':' ↓'),'ghost-button');
+        button.type='button';button.title='클릭하면 정렬 방향 변경';button.onclick=()=>changeSort(rule.key);panel.append(button);
+        const remove=makeElement('button','×','ghost-button');remove.type='button';remove.setAttribute('aria-label',label+' 정렬 제거');
+        remove.onclick=()=>{state.sortRules.splice(index,1);renderResults();};panel.append(remove);
+      });
+      const select=makeElement('select');select.setAttribute('aria-label','정렬 항목 추가');
+      select.append(makeOption('','정렬 항목 추가'));
+      COLUMNS.filter(c=>!['reviewEdit','reviewReason'].includes(c.key)&&!state.sortRules.some(r=>r.key===c.key)).forEach(c=>select.append(makeOption(c.key,c.label)));
+      select.onchange=()=>{if(select.value)changeSort(select.value);};panel.append(select);
+      const reset=makeElement('button','정렬 초기화','ghost-button');reset.type='button';
+      reset.onclick=()=>{state.sortRules=[];state.sortKey=DEFAULT_SORT_KEY;state.sortDirection=DEFAULT_SORT_DIRECTION;syncSortControls();renderResults();};
+      panel.append(reset);
+      const help=makeElement('small','열 제목 또는 정렬 항목을 선택한 순서대로 적용됩니다.');panel.append(help);
     }
 
     function syncSortControls() {
@@ -5984,6 +6025,7 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
       state.lastTotalMatches = 0;
       state.lastTruncated = false;
       state.visibleCount = INITIAL_PAGE_SIZE;
+      state.sortRules = [];
       state.sortKey = DEFAULT_SORT_KEY;
       state.sortDirection = DEFAULT_SORT_DIRECTION;
       syncSortControls();
@@ -6699,11 +6741,9 @@ document.getElementById('editorButton').addEventListener('click',openEditor);
       updateMobileTopFab();
       if (EDITION === 'pc') elements.exportButton.addEventListener('click', exportCurrentResults);
       else elements.exportButton.hidden = true;
-      elements.mobileSortSelect.addEventListener('change', () => { state.sortKey = elements.mobileSortSelect.value; renderResults(); });
+      elements.mobileSortSelect.addEventListener('change', () => changeSort(elements.mobileSortSelect.value));
       elements.mobileSortDirection.addEventListener('click', () => {
-        state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
-        syncSortControls();
-        renderResults();
+        changeSort(elements.mobileSortSelect.value);
       });
       elements.settingsButton.addEventListener('click', openSettings);
       elements.settingsCloseButton.addEventListener('click', () => elements.settingsDialog.close());
