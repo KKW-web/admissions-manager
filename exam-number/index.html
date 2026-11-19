@@ -1,15 +1,35 @@
 <!doctype html>
-<html lang="ko">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="referrer" content="no-referrer">
-<title>2027 수시 수험번호 검색기</title>
+<html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self' https://susi-number-lookup-2027.bboykw.chatgpt.site"><title>2027 수시 수험번호 검색기</title>
 <style>
-*{box-sizing:border-box}body{margin:0;height:100dvh;display:flex;flex-direction:column;color:#183c34;background:#f6f9f8;font:15px/1.5 system-ui,sans-serif}header{padding:12px clamp(14px,3vw,36px);display:flex;align-items:center;gap:6px 22px;flex-wrap:wrap;border-bottom:1px solid #ccdad4;background:white}h1{font-size:20px;margin:0}p{margin:0;color:#405b51}a{margin-left:auto;color:#115944;font-weight:600}iframe{width:100%;border:0;flex:1;min-height:0}@media(max-width:720px){p{order:3;width:100%;font-size:13px}a{font-size:13px}}
-</style>
-</head>
-<body>
-<header><h1>수시 수험번호 검색기</h1><p>교사 로그인 후 ‘학생·지원 관리’에서 이름이나 수험번호를 검색하세요.</p><a href="https://ieum-admissions-2027-kkw.bboykw.chatgpt.site/" target="_blank" rel="noopener noreferrer">새 창에서 검색 ↗</a></header>
-<iframe title="교사용 수험번호 조회" src="https://ieum-admissions-2027-kkw.bboykw.chatgpt.site/shell.html" allow="clipboard-write"></iframe>
-</body></html>
+*{box-sizing:border-box}body{margin:0;background:#f3f6f5;color:#172e2a;font:15px/1.55 "Malgun Gothic",system-ui,sans-serif}main{max-width:1450px;margin:auto;padding:34px clamp(16px,4vw,60px)}header{background:#153e36;color:#fff;border-radius:20px;padding:clamp(22px,4vw,48px);display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}h1{font-size:clamp(25px,3vw,40px);letter-spacing:-.055em;margin:2px 0}header p{margin:5px 0;color:#d1e4dd}button,input,select{font:inherit;border:1px solid #b6c7bf;border-radius:8px;padding:8px 12px;background:white;color:inherit}button{cursor:pointer}header button{background:#d2f495;color:#223824;font-weight:700;padding:12px 22px;border:0}nav{display:flex;gap:6px;margin:24px 0;flex-wrap:wrap}nav button[aria-pressed=true]{background:#194b40;color:white}section{background:white;border:1px solid #d5dfda;border-radius:15px;padding:18px}#filters{display:flex;flex-wrap:wrap;gap:12px;align-items:end}label{display:grid;gap:4px;font-size:13px;font-weight:600}select{max-width:220px}#wrap{overflow:auto;max-height:61vh}table{border-collapse:separate;border-spacing:0;width:100%;white-space:nowrap;font-size:14px}td,th{padding:9px 12px;text-align:left;border-bottom:1px solid #e4eae7}th{position:sticky;top:0;background:#eef4f0;color:#385b50}td button{font:600 14px monospace;color:#165a44;padding:4px 8px}footer{display:flex;gap:14px;align-items:center;justify-content:flex-end;margin-top:12px}button:disabled{opacity:.45;cursor:default}#status{min-height:24px}#count{font-weight:bold}input[type=search]{width:min(380px,75vw)}[hidden]{display:none!important}
+#signin{display:flex;align-items:end;gap:8px;flex-wrap:wrap}#signin input{color:#172e2a;width:155px}#signin label{color:white}#lock{margin-left:auto}#tabs{align-items:center}#status{color:#385b50}footer{flex-wrap:wrap}</style><main>
+<header><div><small>2027학년도 · 수시모집</small><h1>수험번호 검색기</h1><p>10월 22일 수정본 · 재학생 및 졸업생 지원 자료</p></div>
+<form id="signin"><label>검색기 전용 비밀번호<input type="password" id="pin" inputmode="numeric" autocomplete="current-password" required></label><button id="enter">로그인</button></form><button id="lock" hidden>로그아웃</button></header>
+<p id="status" role="status"></p>
+<div id="app" hidden><nav id="tabs" aria-label="자료 선택"></nav><section><div id="filters"><label>통합 검색<input id="q" type="search" placeholder="학생 이름, 대학, 학과, 수험번호"></label><div id="selects" style="display:contents"></div><button id="reset">검색 초기화</button></div><p id="count" role="status"></p><div id="wrap"><table><thead></thead><tbody></tbody></table></div><footer><button id="prev">이전</button><span id="page"></span><button id="next">다음</button></footer></section></div></main>
+<script>
+'use strict';
+const base=location.origin==='https://kkw-web.github.io'?'https://susi-number-lookup-2027.bboykw.chatgpt.site':location.origin;
+const $=id=>document.getElementById(id), elem=(tag,text)=>{const e=document.createElement(tag);e.textContent=text;return e};
+let token='',page=0,seq=0,tab='지원내역',timer,expiry;
+const names=['지원내역','요청이력','대학별현황','확인필요'];
+function lock(message=''){token='';seq++;clearTimeout(timer);clearTimeout(expiry);$('app').hidden=true;$('signin').hidden=false;$('lock').hidden=true;$('pin').value='';$('q').value='';$('selects').replaceChildren();document.querySelector('tbody').replaceChildren();$('status').textContent=message;}
+async function request(path,data){const headers={'Content-Type':'application/json'};if(token)headers.Authorization='Bearer '+token;
+ const response=await fetch(base+path,{method:'POST',headers,body:JSON.stringify(data),credentials:'omit',cache:'no-store'});
+ const result=await response.json();if(!response.ok){if(path==='/search'&&response.status===401)lock(result.error);throw Error(result.error||'조회에 실패했습니다.')}return result;}
+$('signin').onsubmit=async e=>{e.preventDefault();$('enter').disabled=true;try{const r=await request('/login',{password:$('pin').value});token=r.token;$('pin').value='';$('signin').hidden=true;$('lock').hidden=false;$('app').hidden=false;expiry=setTimeout(()=>lock('조회 시간이 끝났습니다. 다시 로그인해 주세요.'),1800000);openTab('지원내역');}catch(e){$('status').textContent=e.message||'로그인에 실패했습니다.'}finally{$('enter').disabled=false}};
+$('lock').onclick=()=>lock('로그아웃했습니다.');
+function openTab(name){tab=name;page=0;clearTimeout(timer);$('q').value='';$('selects').replaceChildren();$('tabs').replaceChildren();
+ for(const n of names){const b=elem('button',n);b.setAttribute('aria-pressed',String(n===tab));b.onclick=()=>openTab(n);$('tabs').append(b)}load(true);}
+async function load(options=false){
+ const id=++seq;const filters=Object.fromEntries([...$('selects').querySelectorAll('select')].map(s=>[s.name,s.value]));
+ $('status').textContent='조회 중…';
+ try{const r=await request('/search',{tab,query:$('q').value,filters,page,options});if(id!==seq||!token)return;
+ if(r.options){$('selects').replaceChildren();for(const [k,values] of Object.entries(r.options)){const l=elem('label',k),s=elem('select','');s.name=k;s.add(new Option('전체',''));for(const v of values)s.add(new Option(v,v));s.onchange=()=>{page=0;load()};l.append(s);$('selects').append(l)}}
+ page=r.page;const head=elem('tr','');for(const col of r.cols)head.append(elem('th',col));document.querySelector('thead').replaceChildren(head);
+ const body=document.querySelector('tbody');body.replaceChildren();for(const row of r.rows){const tr=elem('tr','');for(const col of r.cols){const val=row[col];const td=elem('td',val||'—');if(col==='수험번호'&&val){const b=elem('button',val);b.title='수험번호 복사';b.onclick=async()=>{try{await navigator.clipboard.writeText(val);$('status').textContent='수험번호를 복사했습니다.'}catch{prompt('수험번호를 복사해 주세요.',val)}};td.replaceChildren(b)}tr.append(td)}body.append(tr)}
+ $('count').textContent='검색 결과 '+r.count.toLocaleString()+'건 / 전체 '+r.total.toLocaleString()+'건';$('status').textContent=r.count?'':'조건에 맞는 자료가 없습니다.';$('page').textContent=(r.count?page+1:0)+' / '+Math.ceil(r.count/50);$('prev').disabled=!page;$('next').disabled=(page+1)*50>=r.count;$('wrap').scrollTop=0;
+ }catch(e){if(id===seq){$('status').textContent=e.message;document.querySelector('tbody').replaceChildren();$('count').textContent=''}}}
+$('q').oninput=()=>{page=0;clearTimeout(timer);timer=setTimeout(()=>load(!$('selects').children.length),220)};
+$('prev').onclick=()=>{if(page>0){page--;load()}};$('next').onclick=()=>{page++;load()};$('reset').onclick=()=>openTab(tab);
+</script></html>
