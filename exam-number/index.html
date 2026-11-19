@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'"><title>2027 수시 수험번호 검색기</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f6f5;color:#172e2a;font:15px/1.55 "Malgun Gothic",system-ui,sans-serif}main{max-width:1450px;margin:auto;padding:34px clamp(16px,4vw,60px)}header{background:#153e36;color:#fff;border-radius:20px;padding:clamp(22px,4vw,48px);display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}h1{font-size:clamp(25px,3vw,40px);letter-spacing:-.055em;margin:2px 0}header p{margin:5px 0;color:#d1e4dd}button,input,select{font:inherit;border:1px solid #b6c7bf;border-radius:8px;padding:8px 12px;background:white;color:inherit}button{cursor:pointer}header button{background:#d2f495;color:#223824;font-weight:700;padding:12px 22px;border:0}nav{display:flex;gap:6px;margin:24px 0;flex-wrap:wrap}nav button[aria-pressed=true]{background:#194b40;color:white}section{background:white;border:1px solid #d5dfda;border-radius:15px;padding:18px}#filters{display:flex;flex-wrap:wrap;gap:12px;align-items:end}label{display:grid;gap:4px;font-size:13px;font-weight:600}select{max-width:220px}#wrap{overflow:auto;max-height:61vh}table{border-collapse:separate;border-spacing:0;width:100%;white-space:nowrap;font-size:14px}td,th{padding:9px 12px;text-align:left;border-bottom:1px solid #e4eae7}th{position:sticky;top:0;background:#eef4f0;color:#385b50}td button{font:600 14px monospace;color:#165a44;padding:4px 8px}footer{display:flex;gap:14px;align-items:center;justify-content:flex-end;margin-top:12px}button:disabled{opacity:.45;cursor:default}#status{min-height:24px}#count{font-weight:bold}input[type=search]{width:min(380px,75vw)}[hidden]{display:none!important}
+</style><main><header><div><small>2027학년도 · 수시모집</small><h1>수험번호 검색기</h1><p>엑셀을 선택하면 이 브라우저에서 학생별 지원 내역을 조회할 수 있습니다.</p></div><button id="openBook">엑셀 파일 열기</button><input hidden type="file" id="book" accept=".xlsx"></header><p id="status" role="status">2027학년도 수시 수험번호 검색기 엑셀 파일(.xlsx)을 선택해 주세요.</p><div id="app" hidden><nav id="tabs" aria-label="자료 선택"></nav><section><div id="filters"></div><p id="count" aria-live="polite"></p><div id="wrap"><table><thead></thead><tbody></tbody></table></div><footer><button id="prev">이전</button><span id="page"></span><button id="next">다음</button></footer></section></div></main><script>
+'use strict';
+const $=id=>document.getElementById(id);
+const configs={
+ '지원내역': ['재학여부','자료학년도','반','번호','성명','대학','전형','학과','수험번호','내신','생년월일','평가대상명'],
+ '요청이력':['재학여부','자료학년도','반','번호','성명','대학','평가대상명','수험번호','요청구분','재요청사유','최종처리일시'],
+ '대학별현황':null,
+ '확인필요':['재학여부','자료학년도','반','번호','성명','대학','평가대상명','수험번호','확인 사유']
+};
+let sheets={},tab='지원내역',filtered=[],page=0;
+const size=60;
+async function openZip(file){
+ const bytes=new Uint8Array(await file.arrayBuffer()),v=new DataView(bytes.buffer),u16=i=>v.getUint16(i,true),u32=i=>v.getUint32(i,true),decoder=new TextDecoder();
+ let end=bytes.length-22;
+ while(end>=Math.max(0,bytes.length-65557)&&u32(end)!==0x06054b50)end--;
+ if(end<0||u32(end)!==0x06054b50)throw Error('엑셀 파일 형식을 확인해 주세요.');
+ const entries=new Map();let pos=u32(end+16);
+ for(let i=0;i<u16(end+10);i++){
+  if(u32(pos)!==0x02014b50)throw Error('파일 목록을 읽을 수 없습니다.');
+  const n=u16(pos+28),name=decoder.decode(bytes.subarray(pos+46,pos+46+n));
+  entries.set(name,[u32(pos+42),u32(pos+20),u16(pos+10)]);pos+=46+n+u16(pos+30)+u16(pos+32);
+ }
+ return async name=>{
+  if(!entries.has(name))return null;
+  const [offset,length,method]=entries.get(name),start=offset+30+u16(offset+26)+u16(offset+28);
+  let stream=new Blob([bytes.subarray(start,start+length)]).stream();
+  if(method===8)stream=stream.pipeThrough(new DecompressionStream('deflate-raw'));else if(method!==0)throw Error('지원하지 않는 압축 형식입니다.');
+  const doc=new DOMParser().parseFromString(await new Response(stream).text(),'application/xml');
+  if(doc.querySelector('parsererror'))throw Error('시트 정보를 읽을 수 없습니다.');return doc;
+ };
+}
+const nodes=(root,name)=>Array.from(root.getElementsByTagNameNS('*',name));
+const rich=node=>nodes(node,'t').map(t=>t.textContent).join('');
+async function readBook(file){
+ const read=await openZip(file),wb=await read('xl/workbook.xml'),rels=await read('xl/_rels/workbook.xml.rels');
+ if(!wb||!rels)throw Error('엑셀 통합문서인지 확인해 주세요.');
+ const shared=await read('xl/sharedStrings.xml'),strings=shared?nodes(shared,'si').map(rich):[],data={};
+ const targets=new Map(nodes(rels,'Relationship').map(r=>[r.getAttribute('Id'),new URL(r.getAttribute('Target'),'https://local/xl/workbook.xml').pathname.slice(1)]));
+ for(const sheet of nodes(wb,'sheet')){
+  const name=sheet.getAttribute('name');if(!Object.hasOwn(configs,name))continue;
+  const doc=await read(targets.get(sheet.getAttribute('r:id')));if(!doc)continue;
+  const rows=nodes(doc,'row'),keys={},items=[];
+  for(const [index,row] of rows.entries()){
+   const item={};
+   for(const c of row.children){
+    const col=(c.getAttribute('r')||'').replace(/\d+/g,''),type=c.getAttribute('t'),raw=c.getElementsByTagNameNS('*','v')[0]?.textContent||'';
+    if(index&&!keys[col])continue;
+    let val=type==='s'?strings[Number(raw)]??'':type==='inlineStr'?rich(c):raw;
+    if(!index){if((configs[name]||[]).includes(val)||(name==='대학별현황'&&(val==='대학'||/^(금일|누계)/.test(val))))keys[col]=val;continue;}
+    if(keys[col]==='내신'&&val&&Number.isFinite(Number(val)))val=String(+Number(val).toFixed(2));
+    if(keys[col]==='최종처리일시'&&type!=='s'&&/^\d{5}(\.\d+)?$/.test(val))val=new Date(Math.round((Number(val)-25569)*86400000)).toISOString().slice(0,16).replace('T',' ');
+    item[keys[col]]=val;
+   }
+   if(index&&(item['성명']||item['대학']))items.push(item);
+  }
+  const cols=configs[name]||Object.values(keys);
+  if(name==='지원내역'&&!['성명','대학','수험번호'].every(k=>Object.values(keys).includes(k)))throw Error('지원내역 시트의 열 제목을 확인해 주세요.');
+  data[name]={cols,items};
+ }
+ if(!data['지원내역'])throw Error('지원내역 시트가 있는 원본 엑셀을 선택해 주세요.');return data;
+}
+function elem(tag,txt){const el=document.createElement(tag);el.textContent=txt;return el}
+function showTab(name){
+ tab=name;$('tabs').replaceChildren();for(const key of Object.keys(configs)){if(!sheets[key])continue;const b=elem('button',key);b.setAttribute('aria-pressed',String(key===tab));b.onclick=()=>showTab(key);$('tabs').append(b)}
+ const box=$('filters');box.replaceChildren();const label=elem('label','통합 검색');const q=elem('input','');q.type='search';q.placeholder='이름, 대학, 전형, 학과, 수험번호';label.append(q);box.append(label);
+ const selects=[];for(const key of ['재학여부','반','대학','전형','학과']){
+ if(!sheets[tab].cols.includes(key))continue;const l=elem('label',key),s=elem('select','');s.add(new Option('전체',''));
+ for(const v of [...new Set(sheets[tab].items.map(r=>r[key]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko',{numeric:true})))s.add(new Option(v,v));l.append(s);box.append(l);selects.push([key,s]);s.onchange=apply;
+ }
+ const clear=elem('button','검색 초기화');clear.onclick=()=>showTab(tab);box.append(clear);
+ function apply(){const groups=q.value.trim().toLocaleLowerCase().split(/[,，]/).map(g=>g.trim().split(/\s+/)).filter(g=>g[0]);
+ filtered=sheets[tab].items.filter(r=>{if(!selects.every(([k,s])=>!s.value||r[k]===s.value))return false;const value=Object.values(r).join(' ').toLocaleLowerCase();return !groups.length||groups.some(g=>g.every(t=>value.includes(t)))});page=0;render();}
+ q.oninput=apply;apply();
+}
+function render(){
+ const {cols,items}=sheets[tab],head=document.querySelector('thead'),body=document.querySelector('tbody');const row=elem('tr','');for(const k of cols)row.append(elem('th',k));head.replaceChildren(row);body.replaceChildren();
+ for(const item of filtered.slice(page*size,(page+1)*size)){const tr=elem('tr','');for(const k of cols){const val=item[k],td=elem('td',val||'—');if(k==='수험번호'&&val){const b=elem('button',val);b.title='수험번호 복사';b.onclick=async()=>{try{await navigator.clipboard.writeText(val);$('status').textContent='수험번호를 복사했습니다.'}catch{prompt('수험번호를 복사해 주세요.',val)}};td.replaceChildren(b)}tr.append(td)}body.append(tr)}
+ $('count').textContent=filtered.length?'검색 결과 '+filtered.length.toLocaleString()+'건 / 전체 '+items.length.toLocaleString()+'건':'검색 결과가 없습니다.';$('page').textContent=(filtered.length?page+1:0)+' / '+Math.ceil(filtered.length/size);$('prev').disabled=!page;$('next').disabled=(page+1)*size>=filtered.length;$('wrap').scrollTop=0;
+}
+$('prev').onclick=()=>{page--;render()};$('next').onclick=()=>{page++;render()};$('openBook').onclick=()=>$('book').click();
+$('book').onchange=async e=>{const file=e.target.files[0];if(!file)return;$('openBook').disabled=true;$('status').textContent='엑셀 자료를 읽고 있습니다…';
+try{sheets=await readBook(file);showTab('지원내역');$('app').hidden=false;$('status').textContent=file.name+' · 이 창을 닫으면 조회 자료가 지워집니다.'}
+catch(err){sheets={};filtered=[];$('app').hidden=true;$('app').querySelector('tbody').replaceChildren();$('status').textContent='파일 열기 실패 · '+err.message}finally{$('openBook').disabled=false;e.target.value=''}};
+</script></html>
