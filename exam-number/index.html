@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self' https://susi-number-lookup-2027.bboykw.chatgpt.site"><title>2027 수시 수험번호 검색기</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#f3f6f5;color:#172e2a;font:15px/1.55 "Malgun Gothic",system-ui,sans-serif}main{max-width:1450px;margin:auto;padding:34px clamp(16px,4vw,60px)}header{background:#153e36;color:#fff;border-radius:20px;padding:clamp(22px,4vw,48px);display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}h1{font-size:clamp(25px,3vw,40px);letter-spacing:-.055em;margin:2px 0}header p{margin:5px 0;color:#d1e4dd}button,input,select{font:inherit;border:1px solid #b6c7bf;border-radius:8px;padding:8px 12px;background:white;color:inherit}button{cursor:pointer}header button{background:#d2f495;color:#223824;font-weight:700;padding:12px 22px;border:0}nav{display:flex;gap:6px;margin:24px 0;flex-wrap:wrap}nav button[aria-pressed=true]{background:#194b40;color:white}section{background:white;border:1px solid #d5dfda;border-radius:15px;padding:18px}#filters{display:flex;flex-wrap:wrap;gap:12px;align-items:end}label{display:grid;gap:4px;font-size:13px;font-weight:600}select{max-width:220px}#wrap{overflow:auto;max-height:61vh}table{border-collapse:separate;border-spacing:0;width:100%;white-space:nowrap;font-size:14px}td,th{padding:9px 12px;text-align:left;border-bottom:1px solid #e4eae7}th{position:sticky;top:0;background:#eef4f0;color:#385b50}td button{font:600 14px monospace;color:#165a44;padding:4px 8px}footer{display:flex;gap:14px;align-items:center;justify-content:flex-end;margin-top:12px}button:disabled{opacity:.45;cursor:default}#status{min-height:24px}#count{font-weight:bold}input[type=search]{width:min(380px,75vw)}[hidden]{display:none!important}
+*{box-sizing:border-box}body{margin:0;background:#f3f6f5;color:#172e2a;font:15px/1.55 "Malgun Gothic",system-ui,sans-serif}main{max-width:1450px;margin:auto;padding:34px clamp(16px,4vw,60px)}header{background:#153e36;color:#fff;border-radius:20px;padding:clamp(22px,4vw,48px);display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}h1{font-size:clamp(25px,3vw,40px);letter-spacing:-.055em;margin:2px 0}header p{margin:5px 0;color:#d1e4dd}button,input,select{font:inherit;border:1px solid #b6c7bf;border-radius:8px;padding:8px 12px;background:white;color:inherit}button{cursor:pointer}header button{background:#d2f495;color:#223824;font-weight:700;padding:12px 22px;border:0}nav{display:flex;gap:6px;margin:24px 0;flex-wrap:wrap}nav button[aria-pressed=true]{background:#194b40;color:white}section{background:white;border:1px solid #d5dfda;border-radius:15px;padding:18px}#filters{display:flex;flex-wrap:wrap;gap:12px;align-items:end}label{display:grid;gap:4px;font-size:13px;font-weight:600}select{max-width:220px}#wrap{overflow:auto;max-height:61vh}table{border-collapse:separate;border-spacing:0;width:100%;white-space:nowrap;font-size:14px}td,th{padding:9px 12px;text-align:left;border-bottom:1px solid #e4eae7}th{position:sticky;top:0;background:#eef4f0;color:#385b50}td button{font:600 14px system-ui;color:#165a44;padding:4px 8px}footer{display:flex;gap:14px;align-items:center;justify-content:flex-end;margin-top:12px}button:disabled{opacity:.45;cursor:default}#status{min-height:24px}#count{font-weight:bold}input[type=search]{width:min(380px,75vw)}[hidden]{display:none!important}
 #signin{display:flex;align-items:end;gap:8px;flex-wrap:wrap}#signin input{color:#172e2a;width:155px}#signin label{color:white}#lock{margin-left:auto}#tabs{align-items:center}#status{color:#385b50}footer{flex-wrap:wrap}</style><main>
 <header><div><small>2027학년도 · 수시모집</small><h1>수험번호 검색기</h1><p>10월 22일 수정본 · 재학생 및 졸업생 지원 자료</p></div>
 <form id="signin"><label>검색기 전용 비밀번호<input type="password" id="pin" inputmode="numeric" autocomplete="current-password" required></label><button id="enter">로그인</button></form><button id="lock" hidden>로그아웃</button></header>
@@ -26,8 +26,37 @@ async function load(options=false){
  $('status').textContent='조회 중…';
  try{const r=await request('/search',{tab,query:$('q').value,filters,page,options});if(id!==seq||!token)return;
  if(r.options){$('selects').replaceChildren();for(const [k,values] of Object.entries(r.options)){const l=elem('label',k),s=elem('select','');s.name=k;s.add(new Option('전체',''));for(const v of values)s.add(new Option(v,v));s.onchange=()=>{page=0;load()};l.append(s);$('selects').append(l)}}
- page=r.page;const head=elem('tr','');for(const col of r.cols)head.append(elem('th',col));document.querySelector('thead').replaceChildren(head);
- const body=document.querySelector('tbody');body.replaceChildren();for(const row of r.rows){const tr=elem('tr','');for(const col of r.cols){const val=row[col];const td=elem('td',val||'—');if(col==='수험번호'&&val){const b=elem('button',val);b.title='수험번호 복사';b.onclick=async()=>{try{await navigator.clipboard.writeText(val);$('status').textContent='수험번호를 복사했습니다.'}catch{prompt('수험번호를 복사해 주세요.',val)}};td.replaceChildren(b)}tr.append(td)}body.append(tr)}
+ page=r.page;
+ const copyFields=['성명','수험번호','생년월일'];
+ const cols=[...copyFields.filter(col=>r.cols.includes(col)),...r.cols.filter(col=>!copyFields.includes(col))];
+ const head=elem('tr','');
+ for(const col of cols)head.append(elem('th',col==='성명'?'이름':col));
+ document.querySelector('thead').replaceChildren(head);
+ const body=document.querySelector('tbody');
+ body.replaceChildren();
+ for(const row of r.rows){
+   const tr=elem('tr','');
+   for(const col of cols){
+     const val=row[col];
+     const td=elem('td',val||'—');
+     if(copyFields.includes(col)&&val){
+       const label=col==='성명'?'이름':col;
+       const button=elem('button',val);
+       button.type='button';
+       button.title=label+' 복사';
+       button.setAttribute('aria-label',label+' '+val+' 복사');
+       button.onclick=async()=>{
+         try{
+           await navigator.clipboard.writeText(val);
+           $('status').textContent=label+' 복사 완료';
+         }catch{prompt(label+' 값을 선택해 복사해 주세요.',val)}
+       };
+       td.replaceChildren(button);
+     }
+     tr.append(td);
+   }
+   body.append(tr);
+ }
  $('count').textContent='검색 결과 '+r.count.toLocaleString()+'건 / 전체 '+r.total.toLocaleString()+'건';$('status').textContent=r.count?'':'조건에 맞는 자료가 없습니다.';$('page').textContent=(r.count?page+1:0)+' / '+Math.ceil(r.count/50);$('prev').disabled=!page;$('next').disabled=(page+1)*50>=r.count;$('wrap').scrollTop=0;
  }catch(e){if(id===seq){$('status').textContent=e.message;document.querySelector('tbody').replaceChildren();$('count').textContent=''}}}
 $('q').oninput=()=>{page=0;clearTimeout(timer);timer=setTimeout(()=>load(!$('selects').children.length),220)};
