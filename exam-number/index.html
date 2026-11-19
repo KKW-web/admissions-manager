@@ -6,7 +6,7 @@
 <header><div><small>2027학년도 · 수시모집</small><h1>수험번호 검색기</h1><p>10월 22일 수정본 · 재학생 및 졸업생 지원 자료</p></div>
 <form id="signin"><label>검색기 전용 비밀번호<input type="password" id="pin" inputmode="numeric" autocomplete="current-password" required></label><button id="enter">로그인</button></form><button id="lock" hidden>로그아웃</button></header>
 <p id="status" role="status"></p>
-<div id="app" hidden><nav id="tabs" aria-label="자료 선택"></nav><section><div id="filters"><label>통합 검색<input id="q" type="search" placeholder="학생 이름, 대학, 학과, 수험번호"></label><div id="selects" style="display:contents"></div><button id="reset">검색 초기화</button></div><p id="count" role="status"></p><div id="wrap"><table><thead></thead><tbody></tbody></table></div><footer><button id="prev">이전</button><span id="page"></span><button id="next">다음</button></footer></section></div></main>
+<div id="app" hidden><nav id="tabs" aria-label="자료 선택"></nav><section><div id="filters"><label>통합 검색<input id="q" type="search" placeholder="이름, 대학명, 캠퍼스, 수험번호"></label><div id="selects" style="display:contents"></div><button id="reset">검색 초기화</button></div><p id="count" role="status"></p><div id="wrap"><table><thead></thead><tbody></tbody></table></div><footer><button id="prev">이전</button><span id="page"></span><button id="next">다음</button></footer></section></div></main>
 <script>
 'use strict';
 const base=location.origin==='https://kkw-web.github.io'?'https://susi-number-lookup-2027.bboykw.chatgpt.site':location.origin;
