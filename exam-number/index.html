@@ -16,32 +16,32 @@ nav{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:16px 0}#prima
 section{background:white;border:1px solid var(--line);border-radius:14px;overflow:hidden}.controls{padding:clamp(15px,2vw,26px);display:grid;gap:15px}.description{color:var(--muted);font-size:14px}.bar{display:flex;gap:12px;align-items:end}.bar label{flex:1}#q{width:100%;font-size:17px;border:1.5px solid #608882;min-height:46px}.bar button{min-height:46px}details summary{font-weight:650;color:var(--green);width:fit-content}#selects{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:10px}select{width:100%;min-width:0}
 .results{display:flex;align-items:center;gap:8px 16px;justify-content:space-between;flex-wrap:wrap;padding:10px clamp(15px,2vw,26px);background:#edf3f1;border-block:1px solid var(--line)}#count{font-weight:750}#hint{font-size:13px;color:var(--muted)}#wrap{overflow:auto;max-height:60vh;max-height:60dvh}table{border-collapse:separate;border-spacing:0;width:100%;white-space:nowrap;font-size:15px}td,th{padding:8px 12px;border-bottom:1px solid #d9e2df;text-align:left}th{background:#dce9e6;color:#234b48;position:sticky;top:0;z-index:2;font-size:14px}tr:nth-child(even) td{background:#f6f9f8}tr:hover td{background:#edf6ee}td.identity{background:#f3f8f5}td button{min-height:34px;font-weight:650;font-variant-numeric:tabular-nums;color:#114e44;border-color:#b2c8bf;padding:4px 10px}td button[data-copied]{background:#d6efd8;outline:2px solid #4a8064}#empty{padding:32px 16px;text-align:center;color:var(--muted)}footer{display:flex;justify-content:flex-end;align-items:center;gap:12px;padding:12px 18px}#status:not(:empty){margin:10px 0;padding:8px 12px;background:#fff6dd;border-radius:6px}#toast:not(:empty){position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:4;background:#153c38;color:white;border-radius:8px;padding:9px 18px;box-shadow:0 4px 15px #0002;pointer-events:none}
 @media(max-width:640px){main{padding:10px}header{padding:17px;gap:12px}.controls{gap:10px}.bar{gap:6px}#q{font-size:16px}td,th{padding:7px 8px}td button{min-height:40px;padding:4px 6px}nav{gap:7px}nav label{font-size:13px}nav select{width:auto}footer{justify-content:center}#wrap{max-height:55dvh}}
+
+#app{margin-top:18px}.bar label{font-size:17px}.bar input{margin-top:2px}td small{display:block;font-size:11px;color:#48605e;margin-top:3px}td[data-label="대학"]{font-weight:650}#wrap td[data-label="학과"],#wrap td[data-label="전형"]{white-space:normal;min-width:8em;max-width:24em}#wrap td[data-label="수험번호"] button,#wrap td[data-label="생년월일"] button{font-family:ui-monospace,monospace}
+@media(max-width:720px){
+ #app{margin-top:10px}#wrap{max-height:none;overflow:visible}table,tbody{display:block}thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}tbody{padding:0 12px}tbody tr{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:8px 12px;padding:14px 0;border-bottom:1px solid var(--line)}
+ #wrap td,#wrap tr:hover td,#wrap tr:nth-child(even) td{display:block;border:0;padding:0;min-width:0;max-width:none;background:white;white-space:normal;overflow-wrap:anywhere}
+ td:before{content:attr(data-label);display:block;font-size:12px;color:var(--muted);font-weight:600}td[data-label="이름"]{grid-column:1/-1;display:flex!important;align-items:center;gap:8px}td[data-label="이름"]:before{display:none}td small{margin:0}#wrap td[data-label="학과"],#wrap td[data-label="전형"]{min-width:0}td button{max-width:100%;min-height:38px}#signin{max-width:100%}.bar label{min-width:0}
+}
 </style></head><body><main>
 <header><div><small>2027학년도 수시모집 · 10월 22일 수정본</small><h1>수험번호 검색기</h1></div>
 <form id="signin"><label>교사용 접속 비밀번호<input type="password" id="pin" inputmode="numeric" autocomplete="current-password" required></label><button id="enter">로그인</button></form><button id="lock" hidden>로그아웃</button></header>
 <p id="status" role="status"></p><div id="app" hidden>
-<nav aria-label="조회 자료"><button id="primary">학생별 지원내역</button><label>원본 참고자료<select id="reference"><option value="">자료 선택</option><option value="요청이력">자료 요청 이력</option><option value="대학별현황">대학별 처리 현황</option><option value="확인필요">확인 필요 항목</option></select></label></nav>
-<section><div class="controls"><div><h2 id="heading">학생별 지원내역</h2><p id="description" class="description"></p></div>
-<div class="bar"><label>통합 검색<input id="q" type="search" autocomplete="off" placeholder="이름, 대학명, 캠퍼스, 수험번호"></label><button id="reset">초기화</button></div>
+<section><div class="controls">
+<div class="bar"><label>학생별 지원 검색<input id="q" type="search" autocomplete="off" placeholder="이름 또는 대학명 · 여러 대학은 쉼표로 구분"></label><button id="reset">초기화</button></div>
 <details id="more"><summary id="filterTitle">상세 조건</summary><div id="selects"></div></details></div>
 <div class="results"><p id="count" aria-live="polite"></p><span id="hint"></span></div>
 <div id="wrap" tabindex="0" role="region" aria-label="검색 결과 표"><table><thead></thead><tbody></tbody></table><p id="empty" hidden></p></div>
-<footer><button id="prev">이전</button><span id="page"></span><button id="next">다음</button></footer></section></div><div id="toast" role="status"></div></main>
+<footer id="pager" hidden><button id="prev">이전</button><span id="page"></span><button id="next">다음</button></footer></section></div><div id="toast" role="status"></div></main>
 <script>
 'use strict';
 const base=location.origin==='https://kkw-web.github.io'?'https://susi-number-lookup-2027.bboykw.chatgpt.site':location.origin;
 const $=id=>document.getElementById(id);
 function elem(tag,text=''){const el=document.createElement(tag);el.textContent=text;return el}
-const views={
- '지원내역':['학생별 지원내역','이름이나 대학명으로 찾으세요. 쉼표로 구분하면 여러 검색어를 함께 조회합니다.'],
- '요청이력':['자료 요청 이력','대학별 자료의 최초 요청과 재요청 기록입니다. 같은 지원 건도 재요청하면 한 줄 더 표시됩니다.'],
- '대학별현황':['대학별 처리 현황','원본 작성 시점의 대학별 요청·생성·제공·수신 건수입니다. ‘금일’은 원본 집계일을 뜻하며, 전체 목록에는 합계 행이 포함됩니다.'],
- '확인필요':['확인 필요 항목','원본 엑셀에서 별도 확인 대상으로 분류한 항목과 그 사유입니다.']
-};
 const identity=['성명','수험번호','생년월일'];
-let token='',page=0,version=0,tab='지원내역',debounce,expiry,toastTimer,needsOptions=true;
+let token='',page=0,version=0,debounce,expiry,toastTimer,needsOptions=true;
 function clearResults(){
- document.querySelector('thead').replaceChildren();document.querySelector('tbody').replaceChildren();
+ $('pager').hidden=true;document.querySelector('thead').replaceChildren();document.querySelector('tbody').replaceChildren();
  $('empty').hidden=true;$('prev').disabled=$('next').disabled=true;$('page').textContent='';$('count').textContent='';
 }
 function lock(message=''){
@@ -58,24 +58,34 @@ async function request(path,data){
 }
 $('signin').onsubmit=async e=>{e.preventDefault();$('enter').disabled=true;$('status').textContent='로그인 중…';
  try{const r=await request('/login',{password:$('pin').value});token=r.token;$('pin').value='';$('signin').hidden=true;$('lock').hidden=false;$('app').hidden=false;
- expiry=setTimeout(()=>lock('조회 시간이 끝났습니다. 다시 로그인해 주세요.'),1800000);openTab('지원내역');$('q').focus();}
+ expiry=setTimeout(()=>lock('조회 시간이 끝났습니다. 다시 로그인해 주세요.'),1800000);resetSearch();$('q').focus();}
  catch(e){$('status').textContent=e.message;$('pin').select()}finally{$('enter').disabled=false}};
 $('lock').onclick=()=>lock('로그아웃했습니다.');
-function openTab(name){
- tab=name;page=0;needsOptions=true;clearTimeout(debounce);$('reference').value=name==='지원내역'?'':name;$('primary').setAttribute('aria-pressed',String(name==='지원내역'));
- $('heading').textContent=views[name][0];$('description').textContent=views[name][1];$('q').value='';$('q').placeholder=name==='대학별현황'?'대학명 검색':'이름, 대학명, 캠퍼스, 수험번호';
+function resetSearch(){
+ page=0;needsOptions=true;clearTimeout(debounce);$('q').value='';
  $('selects').replaceChildren();$('more').open=false;$('filterTitle').textContent='상세 조건';$('hint').textContent='';clearResults();load();
 }
-$('primary').onclick=()=>openTab('지원내역');$('reference').onchange=()=>openTab($('reference').value||'지원내역');
-function buildFilters(options){
- $('selects').replaceChildren();
+function buildFilters(options,filters){
+ const previous=document.activeElement;
+ const oldControls=new Map([...$('selects').querySelectorAll('select')].map(s=>[s.name,s]));
  for(const [key,values] of Object.entries(options)){
-   if(!values.length)continue;
-   const label=elem('label',key),select=elem('select');select.name=key;select.add(new Option('전체',''));
+   let select=oldControls.get(key);
+   if(!select){
+     const label=elem('label',key);select=elem('select');select.name=key;label.append(select);$('selects').append(label);
+     select.onchange=()=>{
+       if(key==='대학'||key==='전형'){
+         for(const other of $('selects').querySelectorAll('select')){
+           if(other.name==='학과'||(key==='대학'&&other.name==='전형'))other.value='';
+         }
+       }
+       page=0;needsOptions=true;clearTimeout(debounce);load();
+     };
+   }
+   select.replaceChildren(new Option('전체',''));
    for(const val of values)select.add(new Option(val,val));
-   select.onchange=()=>{page=0;clearTimeout(debounce);load()};label.append(select);$('selects').append(label);
+   select.value=filters[key]||'';
  }
- $('more').hidden=!$('selects').children.length;
+ if(previous&&oldControls.get(previous.name)===previous)previous.focus();
 }
 function copyButton(col,val){
  const label=col==='성명'?'이름':col,b=elem('button',val);b.type='button';b.title=label+' 복사';b.setAttribute('aria-label',label+' '+val+' 복사');
@@ -83,26 +93,29 @@ function copyButton(col,val){
  $('toast').textContent=label+' 복사 완료';clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').textContent='',1800)}catch{prompt(label+' 값을 선택해 복사해 주세요.',val)}};return b;
 }
 function render(r){
- const cols=[...identity.filter(k=>r.cols.includes(k)),...r.cols.filter(k=>!identity.includes(k))];
+ const cols=[...identity,'대학','학과','전형','내신'];
  const head=elem('tr');for(const k of cols){const th=elem('th',k==='성명'?'이름':k);th.scope='col';head.append(th)}document.querySelector('thead').replaceChildren(head);
  const body=document.createDocumentFragment();
- for(const row of r.rows){const tr=elem('tr');for(const col of cols){const v=row[col],td=elem('td',v||'—');
- if(v&&identity.includes(col)){td.className='identity';td.replaceChildren(copyButton(col,v))}tr.append(td)}body.append(tr)}
+ for(const row of r.rows){const tr=elem('tr');for(const col of cols){const v=row[col],td=elem('td',v||'—');td.dataset.label=col==='성명'?'이름':col;
+ if(v&&identity.includes(col)){td.className='identity';td.replaceChildren(copyButton(col,v))}if(col==='성명'){
+   const context=[row['재학여부'],row['자료학년도']&&row['재학여부']==='졸업생'?row['자료학년도']+'학년도':'',row['반']?row['반']+'반':'',row['번호']?row['번호']+'번':''].filter(Boolean);
+   td.append(elem('small',context.join(' · ')));
+ }tr.append(td)}body.append(tr)}
  document.querySelector('tbody').replaceChildren(body);page=r.page;
  $('hint').textContent=r.rows.length&&cols.some(k=>identity.includes(k))?'테두리가 있는 값을 누르면 복사됩니다.':'';
- const unit=tab==='대학별현황'?'행':'건';$('count').textContent='검색 결과 '+r.count.toLocaleString()+unit+' / 전체 '+r.total.toLocaleString()+unit;
+ $('count').textContent=r.count===r.total?'전체 '+r.total.toLocaleString()+'건':'검색 결과 '+r.count.toLocaleString()+'건 / 전체 '+r.total.toLocaleString()+'건';$('pager').hidden=r.count<=50;
  $('empty').hidden=!!r.count;$('empty').textContent=r.total?'일치하는 자료가 없습니다. 검색어나 상세 조건을 확인해 주세요.':'원본에 등록된 항목이 없습니다.';
  $('page').textContent=r.count?(page+1)+' / '+Math.ceil(r.count/50)+'쪽':'';$('prev').disabled=!page;$('next').disabled=(page+1)*50>=r.count;$('wrap').scrollTop=0;
 }
 async function load(){
  const id=++version,filters=Object.fromEntries([...$('selects').querySelectorAll('select')].map(s=>[s.name,s.value]).filter(([,v])=>v));
  const active=Object.entries(filters).map(([k,v])=>k+' '+v);$('filterTitle').textContent=active.length?'상세 조건 · '+active.join(' / '):'상세 조건';
- $('status').textContent='조회 중…';$('prev').disabled=$('next').disabled=true;
- try{const r=await request('/search',{tab,query:$('q').value,filters,page,options:needsOptions});if(id!==version||!token)return;
- if(r.options){buildFilters(r.options);needsOptions=false}render(r);$('status').textContent='';}
+ clearResults();$('hint').textContent='';$('status').textContent='조회 중…';$('prev').disabled=$('next').disabled=true;
+ try{const r=await request('/search',{tab:'지원내역',query:$('q').value,filters,page,options:needsOptions});if(id!==version||!token)return;
+ if(r.options){buildFilters(r.options,filters);needsOptions=false}render(r);$('status').textContent='';}
  catch(e){if(id!==version)return;if(e.status===401){lock(e.message);return}clearResults();$('hint').textContent='';$('status').textContent=e.message;}
 }
 $('q').oninput=()=>{version++;page=0;clearTimeout(debounce);clearResults();$('hint').textContent='';debounce=setTimeout(load,180)};
 $('q').onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing){clearTimeout(debounce);page=0;load()}};
-$('prev').onclick=()=>{page--;load()};$('next').onclick=()=>{page++;load()};$('reset').onclick=()=>{openTab(tab);$('q').focus()};
+$('prev').onclick=()=>{page--;load()};$('next').onclick=()=>{page++;load()};$('reset').onclick=()=>{resetSearch();$('q').focus()};
 </script></body></html>
